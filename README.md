@@ -117,3 +117,5 @@ Smaller known limitations:
 
 - The route scheduler only excludes the immediately-previous candidate when rerouting, not everyone ever tried on that task (see [Routing](#routing-lock--reroute-scheduler)).
 - Two-step submission and the `/newtask` wizard use in-memory pending state (`src/bot/pendingActions.js`) — resets on restart/redeploy, and doesn't work across multiple bot instances (not an issue at the current single-instance scale, see DEPLOY.md).
+- `/mytasks` and `/alltasks` are capped at the 20-30 most recently updated tasks with no pagination — fine at pilot scale, but older tasks will scroll out of view once volume grows.
+- `/mytasks` has no status filter (unlike `/alltasks [status]`) — for a contributor with many tasks there's no way to narrow the list yet.
