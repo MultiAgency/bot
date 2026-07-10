@@ -69,6 +69,7 @@ Two problems come up once a group has more than one admin: two admins acting on 
 
 - **Race safety.** `/approve`, `/route`, `/review`, `/amplify`, and `/complete` all use an atomic `updateMany` guarded on the task's current status (same pattern `/claim` already used against double-claims). If two admins act on the same task within the same instant, only one write succeeds — the other gets `"Task #X is already <status> - someone else may have just handled it"` instead of silently overwriting the first decision or sending the contributor contradictory notifications.
 - **Room-scoped admins.** Every task created inside a group is tagged with that group's `Room` (`Task.roomId`). A `RoomAdmin` roster (separate from the global `ADMIN_TELEGRAM_IDS` superadmins) controls who can `/approve`/`/route`/`/review`/etc. tasks belonging to that room — see `src/bot/roomAuth.js`. Whoever adds the bot to a group automatically becomes that room's first admin; `/addroomadmin` (reply to a user's message — Telegram bots can't resolve `@username` to an ID any other way) adds more. Tasks created via DM (no room) are only manageable by global admins.
+- **Room-aware notifications.** New-submission and new-signal-drafted-task alerts go to that task's room admins as well as global admins (`notifyTaskManagers` in `src/bot/notifyAdmins.js`) — a room admin who isn't in `ADMIN_TELEGRAM_IDS` still gets pinged for tasks they're allowed to act on. The bot-added-to-group notification stays global-only since a brand-new room has no other admins yet.
 
 ## Not done yet
 

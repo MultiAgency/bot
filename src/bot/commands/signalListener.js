@@ -1,6 +1,6 @@
 import { processSignalMessage } from '../../signalDetection.js';
 import { getRoomByChatId } from '../../rooms.js';
-import { notifyAdmins } from '../notifyAdmins.js';
+import { notifyTaskManagers } from '../notifyAdmins.js';
 
 // Passively watches group chats that an admin has opted in via
 // /enablesignals, and auto-drafts tasks from promising messages (see
@@ -29,8 +29,9 @@ export function registerSignalListener(bot) {
 
     if (!task) return;
 
-    await notifyAdmins(
+    await notifyTaskManagers(
       ctx,
+      task,
       `New signal in "${ctx.chat.title || ctx.chat.id}" auto-drafted task #${task.id}: "${task.title}"\n` +
         `Use /approve ${task.id} to review it.`
     );

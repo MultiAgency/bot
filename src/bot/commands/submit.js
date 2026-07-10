@@ -1,7 +1,7 @@
 import { prisma } from '../../db.js';
 import { TASK_STATUS } from '../../workflow.js';
 import { convertUrlToFile } from '../../ai/urlToFile.js';
-import { notifyAdmins } from '../notifyAdmins.js';
+import { notifyTaskManagers } from '../notifyAdmins.js';
 
 export function registerSubmit(bot) {
   bot.command('submit', async (ctx) => {
@@ -62,8 +62,9 @@ export function registerSubmit(bot) {
     } else {
       await ctx.reply(`Submitted your result for task #${id}. Waiting for reviewer approval.`);
     }
-    await notifyAdmins(
+    await notifyTaskManagers(
       ctx,
+      task,
       `Task #${id} "${task.title}" just got a new submission from ${ctx.from.username ? '@' + ctx.from.username : ctx.from.id}.\n` +
         `Use /review ${id} approve|reject|revise [note] to handle it.`
     );
