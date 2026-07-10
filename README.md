@@ -90,8 +90,11 @@ Every submission gets a best-effort AI pre-review (`src/ai/reviewSubmission.js`)
 Coverage by submission type:
 - `TEXT` / `LINK` — Claude (Haiku) summarizes the content against the task's title/description/required output (`summarizeSubmission` in `src/ai/claude.js`). For links, it reviews the Jina-Reader-converted text, not the raw URL.
 - `SCREENSHOT` — the image is downloaded from Telegram and sent to Claude's vision input (`reviewSubmissionImage`), which describes what it shows and whether it looks like it satisfies the task.
-- `FILE`, PDF documents — downloaded and sent to Claude's document input (`reviewSubmissionDocument`); the document's mime type is stored in `submissionFileMetadata` when it's uploaded so this branch knows which files qualify.
-- `FILE`, video or non-PDF documents — **not covered.** This is a real Claude API limitation (no video input; only PDF is supported for documents), not a shortcut — `/status` and reviewers won't see an AI note for these.
+- `FILE`, PDF documents — downloaded and sent to Claude's document input (`reviewSubmissionDocument`).
+- `FILE`, `.docx`/`.txt`/`.md`/`.csv` documents — text is extracted **locally** (via `mammoth` for `.docx`, plain decode for the rest — no API cost, no external service) and reviewed the same way as a text submission.
+- `FILE`, video or other document types (legacy `.doc`, `.xlsx`, etc.) — **not covered.** Video is a real Claude API limitation (no video input at all); the remaining document types just aren't parsed yet and could be added the same way `.docx` was, with the right library.
+
+The document's mime type is captured in `submissionFileMetadata` at upload time (`src/bot/commands/submitMedia.js`) so `reviewSubmission.js` knows which branch to use.
 
 ## AI-assisted task drafting
 
@@ -111,11 +114,12 @@ Genuinely blocked on a decision or resource this repo can't provide on its own:
 
 - **Real Twitter/X API scoring** — needs a paid API tier decision (which tier, whose account/budget). `computeTwitterScore` in `src/candidateEvaluation.js` is a ready-to-fill stub that returns `null` (unscored) rather than fabricating a score until that's chosen.
 - **Non-Telegram signal sources** (Twitter, Discord, GitHub, news) — each needs its own credential/service decision (X API, a Discord bot token, a GitHub App, a news API). Only in-chat Telegram messages are watched today.
-- **AI review of video and non-PDF document submissions** — a real Claude API limitation (no video input; only PDF is supported for documents), not something more engineering effort fixes today.
+- **AI review of video submissions** — a real Claude API limitation, Claude has no video input at all. (Document coverage was extended below at no extra cost — video is the one that's actually stuck.)
 
 Smaller known limitations:
 
 - The route scheduler only excludes the immediately-previous candidate when rerouting, not everyone ever tried on that task (see [Routing](#routing-lock--reroute-scheduler)).
 - Two-step submission and the `/newtask` wizard use in-memory pending state (`src/bot/pendingActions.js`) — resets on restart/redeploy, and doesn't work across multiple bot instances (not an issue at the current single-instance scale, see DEPLOY.md).
+- AI review still doesn't cover every document type (legacy `.doc`, `.xlsx`, etc.) — only PDF (via Claude) and `.docx`/`.txt`/`.md`/`.csv` (via local extraction) are wired up. Same pattern, just needs the right library per format.
 - `/mytasks` and `/alltasks` are capped at the 20-30 most recently updated tasks with no pagination — fine at pilot scale, but older tasks will scroll out of view once volume grows.
 - `/mytasks` has no status filter (unlike `/alltasks [status]`) — for a contributor with many tasks there's no way to narrow the list yet.

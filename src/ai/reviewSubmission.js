@@ -1,4 +1,8 @@
+import mammoth from 'mammoth';
 import { summarizeSubmission, reviewSubmissionImage, reviewSubmissionDocument } from './claude.js';
+
+const DOCX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const PLAIN_TEXT_MIME_TYPES = new Set(['text/plain', 'text/markdown', 'text/csv']);
 
 async function downloadTelegramFile(ctx, fileId) {
   const fileLink = await ctx.telegram.getFileLink(fileId);
@@ -27,13 +31,36 @@ export async function reviewSubmission(ctx, task) {
     return reviewSubmissionImage(file.buffer.toString('base64'), file.contentType || 'image/jpeg', task);
   }
 
-  if (task.submissionType === 'FILE' && task.submissionFileMetadata?.mimeType === 'application/pdf' && task.submissionFileId) {
-    const file = await downloadTelegramFile(ctx, task.submissionFileId);
-    if (!file) return null;
-    return reviewSubmissionDocument(file.buffer.toString('base64'), task);
+  if (task.submissionType === 'FILE' && task.submissionFileId) {
+    const mimeType = task.submissionFileMetadata?.mimeType;
+
+    if (mimeType === 'application/pdf') {
+      const file = await downloadTelegramFile(ctx, task.submissionFileId);
+      if (!file) return null;
+      return reviewSubmissionDocument(file.buffer.toString('base64'), task);
+    }
+
+    // .docx and plain-text-ish files are extracted locally (no API cost,
+    // no external service) and reviewed as text, same as a text submission.
+    if (mimeType === DOCX_MIME_TYPE) {
+      const file = await downloadTelegramFile(ctx, task.submissionFileId);
+      if (!file) return null;
+      const { value: text } = await mammoth.extractRawText({ buffer: file.buffer });
+      if (!text?.trim()) return null;
+      return summarizeSubmission(text, task);
+    }
+
+    if (mimeType && PLAIN_TEXT_MIME_TYPES.has(mimeType)) {
+      const file = await downloadTelegramFile(ctx, task.submissionFileId);
+      if (!file) return null;
+      const text = file.buffer.toString('utf-8');
+      if (!text.trim()) return null;
+      return summarizeSubmission(text, task);
+    }
   }
 
-  // FILE (video, or non-PDF documents): Claude's API doesn't accept video
-  // input, and only PDFs are supported for documents - left for a later pass.
+  // Video, or document types not handled above (e.g. legacy .doc, .xlsx,
+  // images embedded in other formats): Claude's API doesn't accept video
+  // input, and these aren't parsed yet - left for a later pass.
   return null;
 }
