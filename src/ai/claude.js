@@ -20,16 +20,50 @@ export async function suggestTaskDescription(shortPrompt) {
   return message.content[0].text;
 }
 
-export async function summarizeSubmission(submissionText) {
+// task carries title/description/requiredOutput so the note can judge fit
+// against what was actually asked for, not just summarize in a vacuum. This
+// is an AI pre-review aid for the human reviewer - it never approves or
+// rejects anything itself.
+export async function summarizeSubmission(submissionText, task) {
   const message = await anthropic.messages.create({
     model: HAIKU_MODEL,
-    max_tokens: 200,
+    max_tokens: 250,
     messages: [
       {
         role: 'user',
         content:
-          'Briefly summarize the following submission for a reviewer, and note whether it looks complete or is missing something:\n' +
-          submissionText,
+          'A contributor submitted the text below for this task:\n' +
+          `Title: ${task.title}\nDescription: ${task.description}\n` +
+          `Required output: ${task.requiredOutput || '(not specified)'}\n\n` +
+          'Briefly summarize the submission for a human reviewer, and note whether it looks complete and matches ' +
+          `the required output, or seems to be missing something:\n\n${submissionText}`,
+      },
+    ],
+  });
+  return message.content[0].text;
+}
+
+// Same purpose as summarizeSubmission but for an image (e.g. a screenshot
+// submission) via Claude's vision input. imageBase64 must not include the
+// "data:image/...;base64," prefix.
+export async function reviewSubmissionImage(imageBase64, mediaType, task) {
+  const message = await anthropic.messages.create({
+    model: HAIKU_MODEL,
+    max_tokens: 250,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
+          {
+            type: 'text',
+            text:
+              'A contributor submitted this image for the task below. Briefly describe what the image shows, ' +
+              'and note whether it looks like it satisfies the task, for a human reviewer:\n' +
+              `Title: ${task.title}\nDescription: ${task.description}\n` +
+              `Required output: ${task.requiredOutput || '(not specified)'}`,
+          },
+        ],
       },
     ],
   });

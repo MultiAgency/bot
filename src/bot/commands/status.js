@@ -14,6 +14,7 @@ export function registerStatus(bot) {
     const lines = [
       `#${task.id} "${task.title}" - ${task.status}`,
       task.assignedContributor ? `Contributor: ${task.assignedContributor.displayName || task.assignedContributor.telegramUsername}` : 'No contributor has claimed it yet.',
+      task.aiReviewNote ? `AI pre-review: ${task.aiReviewNote}` : null,
       task.reviewerNote ? `Reviewer note: ${task.reviewerNote}` : null,
       '',
       'History:',

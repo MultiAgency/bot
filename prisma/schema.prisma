@@ -117,6 +117,7 @@ model Task {
   sourceUrl                String?
   submissionFileMetadata   Json?
   reviewerNote             String?
+  aiReviewNote             String?
 
   createdAt               DateTime        @default(now())
   updatedAt               DateTime        @updatedAt

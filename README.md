@@ -69,6 +69,15 @@ Text and links go through `/submit <id> <content>` (links auto-convert via Jina 
 
 Caption-based submission means there's currently no two-step "‌/submit 5" then "here's the file" flow — the caption has to be on the file itself. That's a deliberate simplification to avoid adding session/state tracking; worth revisiting if it turns out to be an awkward flow on mobile.
 
+## AI pre-review
+
+Every submission gets a best-effort AI pre-review (`src/ai/reviewSubmission.js`), sent as a follow-up message to that task's admins/room admins once ready and stored in `Task.aiReviewNote` (visible via `/status`). It's an aid for the human reviewer, not a decision — it never approves, rejects, or blocks anything, and a failed/slow AI call never breaks the submission itself (it runs after the submission is already recorded and notified, fire-and-forget).
+
+Coverage by submission type:
+- `TEXT` / `LINK` — Claude (Haiku) summarizes the content against the task's title/description/required output (`summarizeSubmission` in `src/ai/claude.js`). For links, it reviews the Jina-Reader-converted text, not the raw URL.
+- `SCREENSHOT` — the image is downloaded from Telegram and sent to Claude's vision input (`reviewSubmissionImage`), which describes what it shows and whether it looks like it satisfies the task.
+- `FILE` (video/document) — **not covered yet.** Claude's API doesn't accept video input, and documents aren't parsed yet; `/status` and reviewers just won't see an AI note for these.
+
 ## Multi-admin / room permissions
 
 Two problems come up once a group has more than one admin: two admins acting on the same task at once, and admins from unrelated rooms being able to touch each other's tasks.
@@ -81,7 +90,8 @@ Two problems come up once a group has more than one admin: two admins acting on 
 
 - Two-step submission flow (`/submit <id>` now, file later) — the caption has to be on the file itself for now
 - Multi-step wizard for `/newtask` (currently a single-line, `|`-delimited syntax)
-- Wiring `suggestTaskDescription` / `summarizeSubmission` (`src/ai/claude.js`) into the task-creation / review flow
+- Wiring `suggestTaskDescription` (`src/ai/claude.js`) into the task-creation flow (submission review is now wired — see AI pre-review above)
+- AI pre-review for video/document submissions (Claude has no video input; documents aren't parsed)
 - Real Twitter/X API scoring (needs a paid API tier decision — see `computeTwitterScore` in `src/candidateEvaluation.js`)
 - Hard routing locks / reroute-on-timeout (needs a scheduler)
 - Signal rate-limit counters are in-memory only (reset on restart/redeploy, not shared across instances)
