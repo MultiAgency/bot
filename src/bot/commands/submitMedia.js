@@ -1,17 +1,30 @@
 import { validateClaimForSubmission, finalizeSubmission } from './submitCore.js';
 import { getTaskManagerIds } from '../notifyAdmins.js';
+import { peekPending, clearPending } from '../pendingActions.js';
 
 // Native Telegram uploads are already a "standardized file" in the sense
 // PROPOSAL_V2.md means (a stored reference, not a live URL) - no conversion
 // step needed like URL submissions get.
 const CAPTION_PATTERN = /^\/submit\s+(\d+)\b\s*(.*)$/is;
 
-function parseSubmitCaption(ctx) {
+// Explicit "/submit <id> [note]" caption wins; otherwise falls back to a
+// pending two-step submission (see pendingActions.js / submit.js) so a file
+// sent after a bare "/submit <id>" still works even without a caption.
+function resolveSubmission(ctx) {
   const caption = ctx.message.caption;
-  if (!caption) return null;
-  const match = caption.match(CAPTION_PATTERN);
-  if (!match) return null;
-  return { id: Number(match[1]), note: match[2].trim() || null };
+  const match = caption?.match(CAPTION_PATTERN);
+  if (match) {
+    clearPending(ctx.from.id); // an explicit caption supersedes any stale pending state
+    return { id: Number(match[1]), note: match[2].trim() || null };
+  }
+
+  const pending = peekPending(ctx.from.id);
+  if (pending?.type === 'submission') {
+    clearPending(ctx.from.id);
+    return { id: pending.data.taskId, note: caption?.trim() || null };
+  }
+
+  return null;
 }
 
 async function forwardToTaskManagers(ctx, task) {
@@ -21,9 +34,9 @@ async function forwardToTaskManagers(ctx, task) {
   );
 }
 
-function registerMediaSubmit(bot, updateType, { submissionType, fileId, label }) {
+function registerMediaSubmit(bot, updateType, { submissionType, fileId, submissionFileMetadata, label }) {
   bot.on(updateType, async (ctx) => {
-    const parsed = parseSubmitCaption(ctx);
+    const parsed = resolveSubmission(ctx);
     if (!parsed) return; // not a submission attempt - ignore silently
 
     const { task, error } = await validateClaimForSubmission(ctx, parsed.id);
@@ -33,6 +46,7 @@ function registerMediaSubmit(bot, updateType, { submissionType, fileId, label })
       submissionType,
       submissionContent: parsed.note,
       submissionFileId: fileId(ctx),
+      submissionFileMetadata: submissionFileMetadata ? submissionFileMetadata(ctx) : null,
     });
 
     await forwardToTaskManagers(ctx, task);
@@ -50,6 +64,10 @@ export function registerSubmitMedia(bot) {
   registerMediaSubmit(bot, 'document', {
     submissionType: 'FILE',
     fileId: (ctx) => ctx.message.document.file_id,
+    submissionFileMetadata: (ctx) => ({
+      mimeType: ctx.message.document.mime_type || null,
+      fileName: ctx.message.document.file_name || null,
+    }),
     label: 'file',
   });
 

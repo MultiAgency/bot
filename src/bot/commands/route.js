@@ -1,9 +1,7 @@
 import { prisma } from '../../db.js';
 import { canManageTask } from '../roomAuth.js';
 import { TASK_STATUS, assertTransition } from '../../workflow.js';
-import { rankCandidates } from '../../matching.js';
-
-const ACTIVE_STATUSES = [TASK_STATUS.CLAIMED, TASK_STATUS.SUBMITTED, TASK_STATUS.REVISION_REQUESTED];
+import { rankCandidatesForTask } from '../../routing.js';
 
 export function registerRoute(bot) {
   bot.command('route', async (ctx) => {
@@ -23,15 +21,7 @@ export function registerRoute(bot) {
       return ctx.reply(`Cannot route: ${err.message}`);
     }
 
-    const candidates = await prisma.contributor.findMany({ where: { isRegistered: true } });
-    const activeCounts = await prisma.task.groupBy({
-      by: ['assignedContributorId'],
-      where: { status: { in: ACTIVE_STATUSES }, assignedContributorId: { not: null } },
-      _count: true,
-    });
-    const activeTaskCounts = new Map(activeCounts.map((c) => [c.assignedContributorId, c._count]));
-
-    const ranked = rankCandidates(task, candidates, activeTaskCounts);
+    const ranked = await rankCandidatesForTask(task);
     const top = ranked[0] ?? null;
 
     // Atomic guard: fails cleanly if another admin already routed/rejected
@@ -42,6 +32,7 @@ export function registerRoute(bot) {
         status: TASK_STATUS.ROUTED,
         routedContributorId: top?.contributor.id ?? null,
         matchScore: top?.score ?? null,
+        routedAt: top ? new Date() : null,
       },
     });
 
@@ -69,9 +60,12 @@ export function registerRoute(bot) {
       )
       .join('\n');
 
+    const lockMinutes = Number(process.env.ROUTE_LOCK_MINUTES || 30);
     await ctx.reply(
       `Task #${id} routed. Suggested contributor: ${top.contributor.displayName || top.contributor.telegramUsername} (score ${top.score}).\n\n` +
-        `Top matches:\n${top3}\n\nTask is now open to any registered contributor via /tasks (routing is a suggestion, not a lock, in this version).`
+        `Top matches:\n${top3}\n\n` +
+        `Only they can /claim it for the next ${lockMinutes} minutes; after that it opens to any registered contributor, ` +
+        'or automatically reroutes to the next-best match if still unclaimed.'
     );
   });
 }

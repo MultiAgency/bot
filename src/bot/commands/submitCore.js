@@ -2,6 +2,7 @@ import { prisma } from '../../db.js';
 import { TASK_STATUS } from '../../workflow.js';
 import { notifyTaskManagers, getTaskManagerIds } from '../notifyAdmins.js';
 import { reviewSubmission } from '../../ai/reviewSubmission.js';
+import { convertUrlToFile } from '../../ai/urlToFile.js';
 
 export async function validateClaimForSubmission(ctx, id) {
   const task = await prisma.task.findUnique({ where: { id }, include: { assignedContributor: true } });
@@ -65,4 +66,32 @@ export async function finalizeSubmission(ctx, task, data) {
   );
 
   runAiPreReview(ctx, updated); // not awaited - fire and forget, see comment above
+}
+
+// Shared by the inline "/submit <id> <content>" form and the two-step flow
+// (see pendingActions.js): standardizes a URL submission via Jina Reader
+// before saving, exactly like submit.js originally did inline.
+export async function submitTextOrLink(ctx, task, content) {
+  const isUrl = /^https?:\/\//i.test(content);
+  const submissionType = isUrl ? 'LINK' : 'TEXT';
+
+  let sourceUrl = null;
+  let submissionFileMetadata = null;
+  if (isUrl) {
+    sourceUrl = content;
+    submissionFileMetadata = await convertUrlToFile(content);
+  }
+
+  await finalizeSubmission(ctx, task, { submissionType, submissionContent: content, sourceUrl, submissionFileMetadata });
+  return submissionFileMetadata;
+}
+
+export function replyForTextSubmission(ctx, id, submissionFileMetadata) {
+  if (submissionFileMetadata?.conversionFailed) {
+    return ctx.reply(
+      `Submitted, but the link couldn't be auto-converted (${submissionFileMetadata.error}). ` +
+        'The reviewer will need to open it manually.'
+    );
+  }
+  return ctx.reply(`Submitted your result for task #${id}. Waiting for reviewer approval.`);
 }

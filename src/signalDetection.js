@@ -5,6 +5,7 @@ import { TASK_STATUS } from './workflow.js';
 const MIN_LENGTH = 15;
 const MIN_WORDS = 3;
 const SCORE_THRESHOLD = Number(process.env.SIGNAL_SCORE_THRESHOLD || 6);
+const MAX_EVALUATIONS_PER_HOUR = Number(process.env.SIGNAL_MAX_PER_HOUR || 20);
 
 // Cheap heuristics to skip obvious noise before spending an API call.
 export function passesPreFilter(text) {
@@ -13,23 +14,13 @@ export function passesPreFilter(text) {
   return true;
 }
 
-// In-memory per-chat rate limit (resets on restart) - enough to cap API
-// spend without needing a persisted counter for this stage.
-const MAX_EVALUATIONS_PER_HOUR = Number(process.env.SIGNAL_MAX_PER_HOUR || 20);
-const evaluationLog = new Map(); // chatId -> array of timestamps (ms)
-
-function underRateLimit(chatId) {
-  const now = Date.now();
-  const oneHourAgo = now - 60 * 60 * 1000;
-  const timestamps = (evaluationLog.get(chatId) || []).filter((t) => t > oneHourAgo);
-  evaluationLog.set(chatId, timestamps);
-  return timestamps.length < MAX_EVALUATIONS_PER_HOUR;
-}
-
-function recordEvaluation(chatId) {
-  const timestamps = evaluationLog.get(chatId) || [];
-  timestamps.push(Date.now());
-  evaluationLog.set(chatId, timestamps);
+// DB-backed per-room rate limit (counts Signal rows created in the last
+// hour) - persists across restarts/redeploys, unlike an in-memory counter.
+async function underRateLimit(roomId) {
+  if (!roomId) return true; // no room to scope the limit to - let it through
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const count = await prisma.signal.count({ where: { roomId, createdAt: { gte: oneHourAgo } } });
+  return count < MAX_EVALUATIONS_PER_HOUR;
 }
 
 // Processes one chat message end to end: pre-filter -> rate limit -> Claude
@@ -37,11 +28,9 @@ function recordEvaluation(chatId) {
 // the threshold. Returns the created task (or null) so the caller can notify
 // admins; never throws (evaluation failures are logged and swallowed so one
 // bad message can't take down the listener).
-export async function processSignalMessage({ text, source, chatId, actorTelegramId, roomId }) {
+export async function processSignalMessage({ text, source, actorTelegramId, roomId }) {
   if (!passesPreFilter(text)) return null;
-  if (!underRateLimit(chatId)) return null;
-
-  recordEvaluation(chatId);
+  if (!(await underRateLimit(roomId))) return null;
 
   let evaluation;
   try {
@@ -65,6 +54,7 @@ export async function processSignalMessage({ text, source, chatId, actorTelegram
       rawText: text,
       status: shouldDraft ? 'DRAFTED' : 'DISCARDED',
       createdByTelegramId: actorTelegramId,
+      roomId: roomId ?? null,
     },
   });
 

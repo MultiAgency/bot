@@ -19,12 +19,14 @@ npm run dev
 
 ## Bot commands
 
-Contributor: `/start`, `/register <twitter_handle>`, `/tasks`, `/claim <id>`, `/submit <id> <content|link>`, `/status <id>`. To submit a video, photo, or file, send it directly to the bot with `/submit <id>` as the caption.
+Contributor: `/start`, `/register <twitter_handle>`, `/tasks`, `/claim <id>`, `/submit <id> [content or link]`, `/status <id>`, `/cancel`. To submit a video, photo, or file, either send it with `/submit <id>` as the caption, or send `/submit <id>` alone and then the file/text within 5 minutes (see [Submissions](#submissions)).
 
 Admin (global admins in `ADMIN_TELEGRAM_IDS`, or room admins for tasks belonging to their room — see [Multi-admin / room permissions](#multi-admin--room-permissions)):
-- `/newtask <title> | <description> | <reward> | <required output> | [category] | [skill1,skill2]`
+- `/newtask <title> | <description> | <reward> | <required output> | [category] | [skill1,skill2]`, or just `/newtask` for a step-by-step wizard
+- `/drafttask <short prompt>` — Claude expands a short request into a full draft
+- `/drafts` — list tasks awaiting approval (all of them for global admins, your rooms' for room admins)
 - `/approve <id>` — Draft → Approved
-- `/route <id>` — Approved → Routed, ranks registered contributors via the matching engine and suggests the top match
+- `/route <id>` — Approved → Routed, ranks registered contributors via the matching engine and reserves the task for the top match (see [Routing](#routing-lock--reroute-scheduler))
 - `/review <id> approve|reject|revise [note]` — Submitted → Reviewed/Rejected/Revision-Requested
 - `/amplify <id> [note]` — Reviewed → Amplified
 - `/complete <id>` — Reviewed/Amplified → Completed, updates contributor stats
@@ -48,7 +50,7 @@ The bot can passively watch group chats and auto-draft a task when a message loo
 2. Add the bot to the group. It auto-detects the invite (`my_chat_member` update, handled in `src/bot/commands/signalChatAdmin.js`), creates a `Room` row for that chat, makes whoever added the bot a room admin, and DMs every global admin with the chat's name/ID and what to do next.
 3. A room admin (or global admin) opens that group and runs `/enablesignals` there. This sets `Room.signalsEnabled = true` (`src/rooms.js`) — no env var, no redeploy. `/disablesignals` turns it back off (also happens automatically if the bot is removed from the group); `/signalstatus` checks the current chat's state.
 
-Pipeline per message: a cheap length/word-count pre-filter runs first (no API cost), then a per-chat rate limit (`SIGNAL_MAX_PER_HOUR`, default 20/hour, in-memory — resets on restart), then Claude (Haiku) scores it 0–10 and drafts a title/description/category/skills if it clears `SIGNAL_SCORE_THRESHOLD` (default 6). Every evaluated message is stored as a `Signal` row regardless of outcome (`status: DRAFTED` or `DISCARDED`), so discarded signals stay auditable.
+Pipeline per message: a cheap length/word-count pre-filter runs first (no API cost), then a per-room rate limit (`SIGNAL_MAX_PER_HOUR`, default 20/hour — backed by a DB count of that room's `Signal` rows in the last hour, so it survives restarts/redeploys), then Claude (Haiku) scores it 0–10 and drafts a title/description/category/skills if it clears `SIGNAL_SCORE_THRESHOLD` (default 6). Every evaluated message is stored as a `Signal` row regardless of outcome (`status: DRAFTED` or `DISCARDED`), so discarded signals stay auditable. Use `/drafts` to review everything currently sitting in `DRAFT`, whether auto-drafted or created manually.
 
 ## Candidate evaluation
 
@@ -61,13 +63,24 @@ Only registered contributors can `/claim` tasks.
 
 ## Matching engine
 
-`src/matching.js` computes a composite match score per PROPOSAL_V2.md's weighting (skill fit, reputation, past performance, social trust, availability, preference) and ranks registered candidates for a task. `/route` uses it to suggest a contributor, but routing is a **suggestion, not a lock** in this version — any registered contributor can still `/claim` a routed task. Hard-locking + reroute-on-timeout would need a background scheduler and is deferred to a later stage.
+`src/matching.js` computes a composite match score per PROPOSAL_V2.md's weighting (skill fit, reputation, past performance, social trust, availability, preference) and ranks registered candidates for a task. `src/routing.js` wraps it with the DB queries needed to actually rank real candidates (fetches registered contributors + their current workload). Both `/route` and the reroute scheduler (below) use it.
+
+## Routing lock + reroute scheduler
+
+`/route` now reserves the task for its top-ranked candidate — a real lock, not just a suggestion. Mechanics:
+- `Task.routedContributorId` + `Task.routedAt` mark who it's reserved for and when. `/claim` rejects anyone else until the lock expires (`ROUTE_LOCK_MINUTES`, default 30).
+- An in-process scheduler (`src/scheduler.js`, started in `src/index.js` alongside the bot) checks every `ROUTE_CHECK_INTERVAL_MINUTES` (default 10) for `ROUTED` tasks whose lock expired while still unclaimed. It reroutes to the next-best candidate (excluding the one who just missed the window), resets the lock, and notifies both the new candidate and the task's managers.
+- After `ROUTE_MAX_REROUTES` attempts (default 3) with no claim, the task opens to any registered contributor instead of continuing to cycle through candidates.
+- The scheduler only excludes the *immediately previous* candidate, not everyone ever tried on that task — with a very small registered pool the same person could be re-suggested after a few rounds. `ROUTE_MAX_REROUTES` bounds how long that can drag on.
+- No external cron needed: this bot is a single long-running process (see DEPLOY.md), so `setInterval` is sufficient.
 
 ## Submissions
 
-Text and links go through `/submit <id> <content>` (links auto-convert via Jina Reader, see above). Video, photo, and document submissions go through Telegram's native upload instead: send the file to the bot with `/submit <id> [optional note]` as its **caption** — no extra command needed, `src/bot/commands/submitMedia.js` listens for `video`/`photo`/`document` messages and checks the caption for a task ID. The Telegram `file_id` is stored directly as `submissionFileId` (already a stable, standardized reference — no conversion step needed, unlike URLs). Photos are tagged `SCREENSHOT`, video/documents are tagged `FILE`. The original message is also forwarded (via `copyMessage`) to that task's admins/room admins alongside the text notification, so reviewers see the actual file immediately instead of having to ask for it.
+Text and links go through `/submit <id> <content>` (links auto-convert via Jina Reader, see above). Two ways to submit a video, photo, or document:
+1. Send the file to the bot with `/submit <id> [optional note]` as its **caption**.
+2. Send `/submit <id>` alone first, then send the text/link/video/photo/document as your next message within 5 minutes (`src/bot/pendingActions.js` tracks this per user, in-memory — `/cancel` aborts it).
 
-Caption-based submission means there's currently no two-step "‌/submit 5" then "here's the file" flow — the caption has to be on the file itself. That's a deliberate simplification to avoid adding session/state tracking; worth revisiting if it turns out to be an awkward flow on mobile.
+Either way, `src/bot/commands/submitMedia.js` (for files) or the pending-text dispatcher (for a bare follow-up message) picks it up. The Telegram `file_id` is stored directly as `submissionFileId` (already a stable, standardized reference — no conversion step needed, unlike URLs). Photos are tagged `SCREENSHOT`, video/documents are tagged `FILE`. The original message is also forwarded (via `copyMessage`) to that task's admins/room admins alongside the text notification, so reviewers see the actual file immediately instead of having to ask for it.
 
 ## AI pre-review
 
@@ -76,7 +89,12 @@ Every submission gets a best-effort AI pre-review (`src/ai/reviewSubmission.js`)
 Coverage by submission type:
 - `TEXT` / `LINK` — Claude (Haiku) summarizes the content against the task's title/description/required output (`summarizeSubmission` in `src/ai/claude.js`). For links, it reviews the Jina-Reader-converted text, not the raw URL.
 - `SCREENSHOT` — the image is downloaded from Telegram and sent to Claude's vision input (`reviewSubmissionImage`), which describes what it shows and whether it looks like it satisfies the task.
-- `FILE` (video/document) — **not covered yet.** Claude's API doesn't accept video input, and documents aren't parsed yet; `/status` and reviewers just won't see an AI note for these.
+- `FILE`, PDF documents — downloaded and sent to Claude's document input (`reviewSubmissionDocument`); the document's mime type is stored in `submissionFileMetadata` when it's uploaded so this branch knows which files qualify.
+- `FILE`, video or non-PDF documents — **not covered.** This is a real Claude API limitation (no video input; only PDF is supported for documents), not a shortcut — `/status` and reviewers won't see an AI note for these.
+
+## AI-assisted task drafting
+
+`/drafttask <short prompt>` sends the prompt to Claude (`draftTask` in `src/ai/claude.js`) and creates a `DRAFT` task from the structured result (title, description, required output, category, skill tags) — same status and same `/approve` gate as a manually-created task, it just skips typing out the pipe-delimited syntax. If Claude's response doesn't parse or is missing a title/description, it tells you to use `/newtask` instead rather than creating a broken task.
 
 ## Multi-admin / room permissions
 
@@ -88,12 +106,13 @@ Two problems come up once a group has more than one admin: two admins acting on 
 
 ## Not done yet
 
-- Two-step submission flow (`/submit <id>` now, file later) — the caption has to be on the file itself for now
-- Multi-step wizard for `/newtask` (currently a single-line, `|`-delimited syntax)
-- Wiring `suggestTaskDescription` (`src/ai/claude.js`) into the task-creation flow (submission review is now wired — see AI pre-review above)
-- AI pre-review for video/document submissions (Claude has no video input; documents aren't parsed)
-- Real Twitter/X API scoring (needs a paid API tier decision — see `computeTwitterScore` in `src/candidateEvaluation.js`)
-- Hard routing locks / reroute-on-timeout (needs a scheduler)
-- Signal rate-limit counters are in-memory only (reset on restart/redeploy, not shared across instances)
-- Non-Telegram signal sources (Twitter, Discord, GitHub, news) — only in-chat messages are watched today
-- `/newtask`, `/drafts`-style listing of pending drafts across rooms doesn't exist yet — admins currently rely on the ID from the creation/notification message
+Genuinely blocked on a decision or resource this repo can't provide on its own:
+
+- **Real Twitter/X API scoring** — needs a paid API tier decision (which tier, whose account/budget). `computeTwitterScore` in `src/candidateEvaluation.js` is a ready-to-fill stub that returns `null` (unscored) rather than fabricating a score until that's chosen.
+- **Non-Telegram signal sources** (Twitter, Discord, GitHub, news) — each needs its own credential/service decision (X API, a Discord bot token, a GitHub App, a news API). Only in-chat Telegram messages are watched today.
+- **AI review of video and non-PDF document submissions** — a real Claude API limitation (no video input; only PDF is supported for documents), not something more engineering effort fixes today.
+
+Smaller known limitations:
+
+- The route scheduler only excludes the immediately-previous candidate when rerouting, not everyone ever tried on that task (see [Routing](#routing-lock--reroute-scheduler)).
+- Two-step submission and the `/newtask` wizard use in-memory pending state (`src/bot/pendingActions.js`) — resets on restart/redeploy, and doesn't work across multiple bot instances (not an issue at the current single-instance scale, see DEPLOY.md).

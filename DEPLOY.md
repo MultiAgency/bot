@@ -48,6 +48,9 @@ Stack: **Telegraf (long polling) + Prisma + Postgres on Neon + Railway**. No pub
    | `TWITTER_BEARER_TOKEN` | optional, leave blank (Twitter scoring stays stubbed) |
    | `SIGNAL_SCORE_THRESHOLD` | optional, defaults to `6` |
    | `SIGNAL_MAX_PER_HOUR` | optional, defaults to `20` |
+   | `ROUTE_LOCK_MINUTES` | optional, defaults to `30` |
+   | `ROUTE_CHECK_INTERVAL_MINUTES` | optional, defaults to `10` |
+   | `ROUTE_MAX_REROUTES` | optional, defaults to `3` |
 
 4. Trigger a deploy (Railway redeploys automatically after variables are saved). On startup, `npm start` runs `prisma migrate deploy` against `DATABASE_URL` before launching the bot — tables are created automatically on first deploy.
 5. Check **Deployments → View Logs**; you should see `Bot is running (long polling).`
@@ -71,7 +74,7 @@ Stack: **Telegraf (long polling) + Prisma + Postgres on Neon + Railway**. No pub
 ## Notes
 
 - **No public URL needed.** Long polling means Railway doesn't need to expose a port for this service — it's fine to leave it as an internal/private service.
-- **Single instance only.** Telegram's long-polling API rejects concurrent `getUpdates` calls from more than one process with the same token — do not scale this service beyond 1 replica, and stop any local `npm run dev` instance before checking the deployed logs (both can't poll at once).
+- **Single instance only.** Telegram's long-polling API rejects concurrent `getUpdates` calls from more than one process with the same token — do not scale this service beyond 1 replica, and stop any local `npm run dev` instance before checking the deployed logs (both can't poll at once). This also matters for `src/scheduler.js` (route reroute checks) and `src/bot/pendingActions.js` (two-step submission / `/newtask` wizard state): both run in-process and assume exactly one instance.
 - **Migrations run on every deploy.** `prisma migrate deploy` is idempotent (only applies pending migrations), so redeploys are safe. If you change `prisma/schema.prisma` locally, run `npm run prisma:migrate` locally first to generate the migration file, commit it, then push — Railway applies it on the next deploy.
 - **Rotate `BOT_TOKEN`** via @BotFather (`/revoke`) if it's ever exposed; update the Railway variable and redeploy.
 - **Switching to webhooks later:** if you outgrow long polling (e.g. need multiple regions or lower latency), swap `bot.launch()` in `src/index.js` for `bot.launch({ webhook: { domain, port } })` and expose a port on Railway — not needed at this scale.

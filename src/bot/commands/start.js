@@ -24,15 +24,19 @@ export function registerStart(bot) {
       '/tasks - view routed/open tasks',
       '/claim <id> - claim a task',
       '/submit <id> <content or link> - submit text or a link',
-      'To submit a video, photo, or file: send it to me with "/submit <id>" as the caption',
+      'To submit a video, photo, or file: send it with "/submit <id>" as the caption, ' +
+        'or just "/submit <id>" alone and then send it within 5 minutes',
       '/status <id> - view task status',
+      '/cancel - cancel a pending submission or task draft',
     ];
 
     if (isAdmin(ctx)) {
       lines.push(
         '',
         'Admin commands (also usable by room admins, scoped to their room):',
-        '/newtask <title> | <description> | <reward> | <required output> - create a task (Draft)',
+        '/newtask <title> | <description> | <reward> | <required output> - create a task (Draft), or just "/newtask" for a step-by-step wizard',
+        '/drafttask <short prompt> - let Claude draft the task for you (Draft)',
+        '/drafts - list pending drafts awaiting approval',
         '/approve <id> - approve a task (Draft -> Approved)',
         '/route <id> - match candidates and open the task (Approved -> Routed)',
         '/review <id> approve|reject|revise [note] - handle a submission',

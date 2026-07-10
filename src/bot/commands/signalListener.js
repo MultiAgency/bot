@@ -19,7 +19,6 @@ export function registerSignalListener(bot) {
     const task = await processSignalMessage({
       text: ctx.message.text,
       source: `telegram:${ctx.chat.title || ctx.chat.id}`,
-      chatId: ctx.chat.id,
       actorTelegramId: BigInt(ctx.from.id),
       roomId: room.id,
     }).catch((err) => {

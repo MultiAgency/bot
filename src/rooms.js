@@ -48,3 +48,11 @@ export async function removeRoomAdmin(roomId, telegramUserId) {
 export async function listRoomAdmins(roomId) {
   return prisma.roomAdmin.findMany({ where: { roomId } });
 }
+
+export async function listRoomIdsForAdmin(telegramUserId) {
+  const entries = await prisma.roomAdmin.findMany({
+    where: { telegramUserId: BigInt(telegramUserId) },
+    select: { roomId: true },
+  });
+  return entries.map((e) => e.roomId);
+}

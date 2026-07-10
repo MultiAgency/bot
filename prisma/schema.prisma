@@ -78,6 +78,11 @@ model Signal {
   createdByTelegramId  BigInt
   createdAt            DateTime @default(now())
 
+  // For DB-backed per-room rate limiting (src/signalDetection.js) - null for
+  // signals evaluated outside a tracked room.
+  roomId              Int?
+  room                Room?    @relation(fields: [roomId], references: [id])
+
   task Task?
 
   @@map("signals")
@@ -103,10 +108,15 @@ model Task {
   roomId                  Int?
   room                    Room?           @relation(fields: [roomId], references: [id])
 
-  // Route step: system-suggested / assigned contributor before claim
+  // Route step: system-suggested / assigned contributor before claim.
+  // routedAt anchors the claim-lock window (src/scheduler.js) - only
+  // routedContributor can /claim until it expires, then the scheduler
+  // rotates to the next-best candidate or opens the task to everyone.
   routedContributorId     Int?
   routedContributor       Contributor?    @relation("RoutedTasks", fields: [routedContributorId], references: [id])
   matchScore               Float?
+  routedAt                 DateTime?
+  rerouteCount              Int             @default(0)
 
   assignedContributorId   Int?
   assignedContributor     Contributor?    @relation("ClaimedTasks", fields: [assignedContributorId], references: [id])
@@ -139,8 +149,9 @@ model Room {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  admins RoomAdmin[]
-  tasks  Task[]
+  admins  RoomAdmin[]
+  tasks   Task[]
+  signals Signal[]
 
   @@map("rooms")
 }
