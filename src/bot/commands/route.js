@@ -1,5 +1,5 @@
 import { prisma } from '../../db.js';
-import { isAdmin } from '../isAdmin.js';
+import { canManageTask } from '../roomAuth.js';
 import { TASK_STATUS, assertTransition } from '../../workflow.js';
 import { rankCandidates } from '../../matching.js';
 
@@ -7,15 +7,15 @@ const ACTIVE_STATUSES = [TASK_STATUS.CLAIMED, TASK_STATUS.SUBMITTED, TASK_STATUS
 
 export function registerRoute(bot) {
   bot.command('route', async (ctx) => {
-    if (!isAdmin(ctx)) {
-      return ctx.reply('Only admins can route tasks.');
-    }
-
     const id = Number(ctx.message.text.split(' ')[1]);
     if (!id) return ctx.reply('Usage: /route <task_id>');
 
     const task = await prisma.task.findUnique({ where: { id } });
     if (!task) return ctx.reply(`Task #${id} not found.`);
+
+    if (!(await canManageTask(ctx, task))) {
+      return ctx.reply('Only admins of this task\'s room (or global admins) can route it.');
+    }
 
     try {
       assertTransition(task.status, TASK_STATUS.ROUTED);
@@ -34,16 +34,24 @@ export function registerRoute(bot) {
     const ranked = rankCandidates(task, candidates, activeTaskCounts);
     const top = ranked[0] ?? null;
 
-    await prisma.task.update({
-      where: { id },
+    // Atomic guard: fails cleanly if another admin already routed/rejected
+    // this task since we read it, instead of overwriting their action.
+    const result = await prisma.task.updateMany({
+      where: { id, status: task.status },
       data: {
         status: TASK_STATUS.ROUTED,
         routedContributorId: top?.contributor.id ?? null,
         matchScore: top?.score ?? null,
-        history: {
-          create: { toStatus: TASK_STATUS.ROUTED, actorTelegramId: BigInt(ctx.from.id) },
-        },
       },
+    });
+
+    if (result.count === 0) {
+      const current = await prisma.task.findUnique({ where: { id } });
+      return ctx.reply(`Task #${id} is already ${current.status} - someone else may have just handled it.`);
+    }
+
+    await prisma.taskHistory.create({
+      data: { taskId: id, fromStatus: task.status, toStatus: TASK_STATUS.ROUTED, actorTelegramId: BigInt(ctx.from.id) },
     });
 
     if (ranked.length === 0) {

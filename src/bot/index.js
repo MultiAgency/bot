@@ -12,6 +12,7 @@ import { registerAmplify } from './commands/amplify.js';
 import { registerComplete } from './commands/complete.js';
 import { registerStatus } from './commands/status.js';
 import { registerSignalChatAdmin } from './commands/signalChatAdmin.js';
+import { registerRoomAdmin } from './commands/roomAdmin.js';
 import { registerSignalListener } from './commands/signalListener.js';
 
 export function createBot(token) {
@@ -30,6 +31,7 @@ export function createBot(token) {
   registerComplete(bot);
   registerStatus(bot);
   registerSignalChatAdmin(bot);
+  registerRoomAdmin(bot);
   // Must be registered last: it's a catch-all `on('text')` listener and
   // would otherwise shadow unmatched-command fallthrough to other handlers.
   registerSignalListener(bot);

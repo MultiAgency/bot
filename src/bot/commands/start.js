@@ -30,7 +30,7 @@ export function registerStart(bot) {
     if (isAdmin(ctx)) {
       lines.push(
         '',
-        'Admin commands:',
+        'Admin commands (also usable by room admins, scoped to their room):',
         '/newtask <title> | <description> | <reward> | <required output> - create a task (Draft)',
         '/approve <id> - approve a task (Draft -> Approved)',
         '/route <id> - match candidates and open the task (Approved -> Routed)',
@@ -40,6 +40,11 @@ export function registerStart(bot) {
         '/enablesignals - turn on auto-drafting from this group\'s messages',
         '/disablesignals - turn it off for this group',
         '/signalstatus - check whether this chat is being watched',
+        '',
+        'Room admin management (run inside a group):',
+        '/addroomadmin - reply to a user\'s message to make them a room admin',
+        '/removeroomadmin - reply to a room admin\'s message to remove them',
+        '/roomadmins - list this room\'s admins',
       );
     }
 

@@ -1,5 +1,5 @@
 import { prisma } from '../../db.js';
-import { isAdmin } from '../isAdmin.js';
+import { canManageTask } from '../roomAuth.js';
 import { TASK_STATUS, assertTransition } from '../../workflow.js';
 
 const DECISION_TO_STATUS = {
@@ -10,10 +10,6 @@ const DECISION_TO_STATUS = {
 
 export function registerReview(bot) {
   bot.command('review', async (ctx) => {
-    if (!isAdmin(ctx)) {
-      return ctx.reply('Only admins can review submissions.');
-    }
-
     const parts = ctx.message.text.split(' ');
     const id = Number(parts[1]);
     const decision = parts[2]?.toLowerCase();
@@ -26,6 +22,10 @@ export function registerReview(bot) {
     const task = await prisma.task.findUnique({ where: { id }, include: { assignedContributor: true } });
     if (!task) return ctx.reply(`Task #${id} not found.`);
 
+    if (!(await canManageTask(ctx, task))) {
+      return ctx.reply('Only admins of this task\'s room (or global admins) can review it.');
+    }
+
     const toStatus = DECISION_TO_STATUS[decision];
     try {
       assertTransition(task.status, toStatus);
@@ -33,13 +33,21 @@ export function registerReview(bot) {
       return ctx.reply(`Cannot review: ${err.message}`);
     }
 
-    await prisma.task.update({
-      where: { id },
-      data: {
-        status: toStatus,
-        reviewerNote: note,
-        history: { create: { toStatus, actorTelegramId: BigInt(ctx.from.id), note } },
-      },
+    // Atomic guard: if another admin reviewed this submission first (even
+    // with a conflicting decision), this touches 0 rows instead of both
+    // decisions "succeeding" and the contributor getting contradictory DMs.
+    const result = await prisma.task.updateMany({
+      where: { id, status: task.status },
+      data: { status: toStatus, reviewerNote: note },
+    });
+
+    if (result.count === 0) {
+      const current = await prisma.task.findUnique({ where: { id } });
+      return ctx.reply(`Task #${id} is already ${current.status} - someone else may have just reviewed it.`);
+    }
+
+    await prisma.taskHistory.create({
+      data: { taskId: id, fromStatus: task.status, toStatus, actorTelegramId: BigInt(ctx.from.id), note },
     });
 
     if (task.assignedContributor && decision === 'reject') {

@@ -98,6 +98,11 @@ model Task {
   signalId                Int?            @unique
   signal                  Signal?         @relation(fields: [signalId], references: [id])
 
+  // The Telegram group this task belongs to, for room-scoped admin
+  // permissions. Null means it was created via DM by a global admin.
+  roomId                  Int?
+  room                    Room?           @relation(fields: [roomId], references: [id])
+
   // Route step: system-suggested / assigned contributor before claim
   routedContributorId     Int?
   routedContributor       Contributor?    @relation("RoutedTasks", fields: [routedContributorId], references: [id])
@@ -121,16 +126,33 @@ model Task {
   @@map("tasks")
 }
 
-model MonitoredChat {
-  id                 Int      @id @default(autoincrement())
-  chatId             BigInt   @unique
-  chatTitle          String?
-  enabled            Boolean  @default(true)
-  addedByTelegramId  BigInt
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+// A Telegram group the bot operates in. Auto-created when the bot is
+// invited (see signalChatAdmin.js). Owns its own admin roster (RoomAdmin)
+// so multiple groups can be managed independently of each other and of the
+// global ADMIN_TELEGRAM_IDS superadmins.
+model Room {
+  id              Int      @id @default(autoincrement())
+  chatId          BigInt   @unique
+  chatTitle       String?
+  signalsEnabled  Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  @@map("monitored_chats")
+  admins RoomAdmin[]
+  tasks  Task[]
+
+  @@map("rooms")
+}
+
+model RoomAdmin {
+  id             Int      @id @default(autoincrement())
+  roomId         Int
+  room           Room     @relation(fields: [roomId], references: [id])
+  telegramUserId BigInt
+  addedAt        DateTime @default(now())
+
+  @@unique([roomId, telegramUserId])
+  @@map("room_admins")
 }
 
 model TaskHistory {

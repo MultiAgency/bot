@@ -37,7 +37,7 @@ function recordEvaluation(chatId) {
 // the threshold. Returns the created task (or null) so the caller can notify
 // admins; never throws (evaluation failures are logged and swallowed so one
 // bad message can't take down the listener).
-export async function processSignalMessage({ text, source, chatId, actorTelegramId }) {
+export async function processSignalMessage({ text, source, chatId, actorTelegramId, roomId }) {
   if (!passesPreFilter(text)) return null;
   if (!underRateLimit(chatId)) return null;
 
@@ -81,6 +81,7 @@ export async function processSignalMessage({ text, source, chatId, actorTelegram
       status: TASK_STATUS.DRAFT,
       createdByTelegramId: actorTelegramId,
       signalId: signal.id,
+      roomId: roomId ?? null,
       history: {
         create: { toStatus: TASK_STATUS.DRAFT, actorTelegramId, note: `Auto-drafted from signal (score ${evaluation.score})` },
       },

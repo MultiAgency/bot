@@ -1,11 +1,20 @@
 import { prisma } from '../../db.js';
-import { isAdmin } from '../isAdmin.js';
+import { isAdmin, canManageRoom } from '../roomAuth.js';
+import { getOrCreateRoom } from '../../rooms.js';
 import { TASK_STATUS } from '../../workflow.js';
 
 export function registerNewTask(bot) {
   bot.command('newtask', async (ctx) => {
-    if (!isAdmin(ctx)) {
-      return ctx.reply('Only admins can create tasks.');
+    const isPrivate = ctx.chat.type === 'private';
+    const room = isPrivate ? null : await getOrCreateRoom(ctx.chat.id, ctx.chat.title);
+
+    const allowed = isPrivate ? isAdmin(ctx) : await canManageRoom(ctx, room.id);
+    if (!allowed) {
+      return ctx.reply(
+        isPrivate
+          ? 'Only global admins can create tasks via DM.'
+          : 'Only admins of this room (or global admins) can create tasks here.'
+      );
     }
 
     const raw = ctx.message.text.split(' ').slice(1).join(' ');
@@ -30,6 +39,7 @@ export function registerNewTask(bot) {
         requiredOutput: requiredOutput || null,
         category: category || null,
         requiredSkills,
+        roomId: room?.id ?? null,
         status: TASK_STATUS.DRAFT,
         createdByTelegramId: BigInt(ctx.from.id),
         history: {
