@@ -1,4 +1,5 @@
 import { prisma } from '../../db.js';
+import { APPLICATION_STATUS } from '../../workflow.js';
 
 export function registerStatus(bot) {
   bot.command('status', async (ctx) => {
@@ -7,19 +8,37 @@ export function registerStatus(bot) {
 
     const task = await prisma.task.findUnique({
       where: { id },
-      include: { assignedContributor: true, history: { orderBy: { createdAt: 'asc' } } },
+      include: {
+        applications: {
+          include: { contributor: true, submissions: { orderBy: { version: 'desc' }, take: 1 } },
+          orderBy: { createdAt: 'asc' },
+        },
+        history: { orderBy: { createdAt: 'asc' } },
+      },
     });
     if (!task) return ctx.reply(`Task #${id} not found.`);
 
+    const assignedCount = task.applications.filter((a) => a.status === APPLICATION_STATUS.ASSIGNED).length;
+
     const lines = [
-      `#${task.id} "${task.title}" - ${task.status}`,
-      task.assignedContributor ? `Contributor: ${task.assignedContributor.displayName || task.assignedContributor.telegramUsername}` : 'No contributor has claimed it yet.',
-      task.aiReviewNote ? `AI pre-review: ${task.aiReviewNote}` : null,
-      task.reviewerNote ? `Reviewer note: ${task.reviewerNote}` : null,
+      `#${task.id} "${task.title}" - ${task.status} (${assignedCount}/${task.maxAssignees} assigned)`,
       '',
-      'History:',
-      ...task.history.map((h) => `- ${h.toStatus} (${h.createdAt.toISOString()})`),
-    ].filter(Boolean);
+      'Applications:',
+    ];
+
+    if (task.applications.length === 0) {
+      lines.push('(none yet)');
+    } else {
+      for (const a of task.applications) {
+        const who = a.contributor.displayName || a.contributor.telegramUsername || a.contributor.id;
+        const latest = a.submissions[0];
+        const submissionInfo = latest ? ` - latest submission v${latest.version}: ${latest.status}` : '';
+        lines.push(`#${a.id} ${who} - ${a.status}${submissionInfo}`);
+      }
+    }
+
+    lines.push('', 'Task history:');
+    lines.push(...task.history.map((h) => `- ${h.toStatus} (${h.createdAt.toISOString()})`));
 
     await ctx.reply(lines.join('\n'));
   });

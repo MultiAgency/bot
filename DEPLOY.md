@@ -48,9 +48,6 @@ Stack: **Telegraf (long polling) + Prisma + Postgres on Neon + Railway**. No pub
    | `TWITTER_COOKIES` | optional, leave blank to keep `twitterScore` unscored. If set, use a **dedicated/throwaway X account** — see README.md "Candidate evaluation" for why (ToS/ban risk) |
    | `SIGNAL_SCORE_THRESHOLD` | optional, defaults to `6` |
    | `SIGNAL_MAX_PER_HOUR` | optional, defaults to `20` |
-   | `ROUTE_LOCK_MINUTES` | optional, defaults to `30` |
-   | `ROUTE_CHECK_INTERVAL_MINUTES` | optional, defaults to `10` |
-   | `ROUTE_MAX_REROUTES` | optional, defaults to `3` |
 
 4. Trigger a deploy (Railway redeploys automatically after variables are saved). On startup, `npm start` runs `prisma migrate deploy` against `DATABASE_URL` before launching the bot — tables are created automatically on first deploy.
 5. Check **Deployments → View Logs**; you should see `Bot is running (long polling).`
@@ -62,19 +59,19 @@ Stack: **Telegraf (long polling) + Prisma + Postgres on Neon + Railway**. No pub
    ```
    /newtask Test task | Say hello | 5 USDT | a reply | content | writing
    /approve <id>
-   /route <id>
    /register <your_twitter_handle>   (from a second account, or reuse yours)
-   /claim <id>
+   /apply <id>
+   /applicants <id>                  (note the application_id it prints)
+   /assign <application_id>
    /submit <id> https://example.com
-   /review <id> approve
-   /complete <id>
+   /review <application_id> approve
    ```
 3. To test signal detection and room admins: add the bot to a Telegram group. You (as a global admin) should get a DM confirming the invite was detected, and whoever added the bot becomes that room's first admin automatically. Open the group and run `/enablesignals`, then post a few sentences describing a real task-shaped request and watch for a "New signal..." DM once it clears the score threshold. Try `/addroomadmin` as a reply to another member's message to grant them room-scoped admin access without adding them to `ADMIN_TELEGRAM_IDS`.
 
 ## Notes
 
 - **No public URL needed.** Long polling means Railway doesn't need to expose a port for this service — it's fine to leave it as an internal/private service.
-- **Single instance only.** Telegram's long-polling API rejects concurrent `getUpdates` calls from more than one process with the same token — do not scale this service beyond 1 replica, and stop any local `npm run dev` instance before checking the deployed logs (both can't poll at once). This also matters for `src/scheduler.js` (route reroute checks) and `src/bot/pendingActions.js` (two-step submission / `/newtask` wizard state): both run in-process and assume exactly one instance.
+- **Single instance only.** Telegram's long-polling API rejects concurrent `getUpdates` calls from more than one process with the same token — do not scale this service beyond 1 replica, and stop any local `npm run dev` instance before checking the deployed logs (both can't poll at once). This also matters for `src/bot/pendingActions.js` (two-step submission / `/newtask` wizard state), which runs in-process and assumes exactly one instance.
 - **Migrations run on every deploy.** `prisma migrate deploy` is idempotent (only applies pending migrations), so redeploys are safe. If you change `prisma/schema.prisma` locally, run `npm run prisma:migrate` locally first to generate the migration file, commit it, then push — Railway applies it on the next deploy.
 - **Rotate `BOT_TOKEN`** via @BotFather (`/revoke`) if it's ever exposed; update the Railway variable and redeploy.
 - **Switching to webhooks later:** if you outgrow long polling (e.g. need multiple regions or lower latency), swap `bot.launch()` in `src/index.js` for `bot.launch({ webhook: { domain, port } })` and expose a port on Railway — not needed at this scale.

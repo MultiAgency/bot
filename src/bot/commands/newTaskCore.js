@@ -14,7 +14,11 @@ export async function resolveCreationContext(ctx) {
   return { room, allowed, isPrivate };
 }
 
-export async function createDraftTask(ctx, roomId, { title, description, reward, requiredOutput, category, requiredSkills }) {
+export async function createDraftTask(
+  ctx,
+  roomId,
+  { title, description, reward, requiredOutput, category, requiredSkills, maxAssignees }
+) {
   return prisma.task.create({
     data: {
       title,
@@ -23,6 +27,7 @@ export async function createDraftTask(ctx, roomId, { title, description, reward,
       requiredOutput: requiredOutput || null,
       category: category || null,
       requiredSkills: requiredSkills || [],
+      maxAssignees: Number.isInteger(maxAssignees) && maxAssignees > 0 ? maxAssignees : 1,
       roomId: roomId ?? null,
       status: TASK_STATUS.DRAFT,
       createdByTelegramId: BigInt(ctx.from.id),
@@ -32,16 +37,17 @@ export async function createDraftTask(ctx, roomId, { title, description, reward,
 }
 
 export function taskCreatedReply(task) {
-  return `Created task #${task.id} (Draft): "${task.title}"\nUse /approve ${task.id}, then /route ${task.id} to match candidates and open it up.`;
+  return `Created task #${task.id} (Draft, max ${task.maxAssignees} assignee${task.maxAssignees === 1 ? '' : 's'}): "${task.title}"\nUse /approve ${task.id} to open it up.`;
 }
 
-const WIZARD_STEP_ORDER = ['title', 'description', 'reward', 'requiredOutput', 'category', 'skills'];
+const WIZARD_STEP_ORDER = ['title', 'description', 'reward', 'requiredOutput', 'category', 'skills', 'maxAssignees'];
 const WIZARD_PROMPTS = {
   description: 'Description?',
   reward: 'Reward? (type "skip" to leave blank)',
   requiredOutput: 'Required output format? (type "skip" to leave blank)',
   category: 'Category? (type "skip" to leave blank)',
   skills: 'Skills, comma-separated? (type "skip" to leave blank)',
+  maxAssignees: 'How many contributors can be assigned at once? (type "skip" for 1)',
 };
 
 function nextWizardStep(step) {
@@ -69,7 +75,8 @@ export async function handleNewTaskWizardStep(ctx, entry) {
     const requiredSkills = updatedFields.skills
       ? updatedFields.skills.split(',').map((s) => s.trim()).filter(Boolean)
       : [];
-    const task = await createDraftTask(ctx, roomId, { ...updatedFields, requiredSkills });
+    const maxAssignees = updatedFields.maxAssignees ? parseInt(updatedFields.maxAssignees, 10) : 1;
+    const task = await createDraftTask(ctx, roomId, { ...updatedFields, requiredSkills, maxAssignees });
     return ctx.reply(taskCreatedReply(task));
   }
 

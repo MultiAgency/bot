@@ -1,6 +1,5 @@
 import 'dotenv/config';
 import { createBot } from './bot/index.js';
-import { startRouteScheduler } from './scheduler.js';
 
 const token = process.env.BOT_TOKEN;
 if (!token) {
@@ -11,13 +10,5 @@ const bot = createBot(token);
 
 bot.launch().then(() => console.log('Bot is running (long polling).'));
 
-const scheduler = startRouteScheduler(bot.telegram);
-
-process.once('SIGINT', () => {
-  clearInterval(scheduler);
-  bot.stop('SIGINT');
-});
-process.once('SIGTERM', () => {
-  clearInterval(scheduler);
-  bot.stop('SIGTERM');
-});
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));

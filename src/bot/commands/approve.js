@@ -1,6 +1,9 @@
 import { prisma } from '../../db.js';
 import { canManageTask } from '../roomAuth.js';
-import { TASK_STATUS, assertTransition } from '../../workflow.js';
+import { TASK_STATUS, assertTaskTransition } from '../../workflow.js';
+import { rankCandidatesForTask } from '../../routing.js';
+
+const NUDGE_TOP_N = 5;
 
 export function registerApprove(bot) {
   bot.command('approve', async (ctx) => {
@@ -15,17 +18,17 @@ export function registerApprove(bot) {
     }
 
     try {
-      assertTransition(task.status, TASK_STATUS.APPROVED);
+      assertTaskTransition(task.status, TASK_STATUS.OPEN);
     } catch (err) {
       return ctx.reply(`Cannot approve: ${err.message}`);
     }
 
-    // Atomic guard: if another admin approved/rejected this task between our
+    // Atomic guard: if another admin approved/closed this task between our
     // read and write, `status: task.status` won't match anymore and this
     // update touches 0 rows instead of silently overwriting their decision.
     const result = await prisma.task.updateMany({
       where: { id, status: task.status },
-      data: { status: TASK_STATUS.APPROVED },
+      data: { status: TASK_STATUS.OPEN },
     });
 
     if (result.count === 0) {
@@ -34,9 +37,27 @@ export function registerApprove(bot) {
     }
 
     await prisma.taskHistory.create({
-      data: { taskId: id, fromStatus: task.status, toStatus: TASK_STATUS.APPROVED, actorTelegramId: BigInt(ctx.from.id) },
+      data: { taskId: id, fromStatus: task.status, toStatus: TASK_STATUS.OPEN, actorTelegramId: BigInt(ctx.from.id) },
     });
 
-    await ctx.reply(`Task #${id} approved. Use /route ${id} to match it with a contributor and open it up.`);
+    await ctx.reply(`Task #${id} approved and open (max ${task.maxAssignees} assignee${task.maxAssignees === 1 ? '' : 's'}). Notifying top-matched contributors to apply.`);
+
+    // Best-effort nudge: rank the registered pool and DM the top matches
+    // encouraging them to /apply. Non-exclusive - anyone can still apply,
+    // this just surfaces the task to people who look like a good fit.
+    const ranked = await rankCandidatesForTask(task).catch((err) => {
+      console.error(`Candidate ranking failed for task #${id}:`, err);
+      return [];
+    });
+
+    const top = ranked.slice(0, NUDGE_TOP_N);
+    await Promise.allSettled(
+      top.map((r) =>
+        ctx.telegram.sendMessage(
+          r.contributor.telegramUserId.toString(),
+          `New task looks like a good fit for you: #${id} "${task.title}" (match score ${r.score}).\nUse /apply ${id} if you're interested.`
+        )
+      )
+    );
   });
 }

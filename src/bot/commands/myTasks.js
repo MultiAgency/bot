@@ -7,20 +7,26 @@ export function registerMyTasks(bot) {
     });
 
     if (!contributor) {
-      return ctx.reply('You have no tasks yet. Use /tasks to see what\'s open.');
+      return ctx.reply('You have no applications yet. Use /tasks to see what\'s open.');
     }
 
-    const tasks = await prisma.task.findMany({
-      where: { assignedContributorId: contributor.id },
+    const applications = await prisma.application.findMany({
+      where: { contributorId: contributor.id },
+      include: { task: true, submissions: { orderBy: { version: 'desc' }, take: 1 } },
       orderBy: { updatedAt: 'desc' },
       take: 20,
     });
 
-    if (tasks.length === 0) {
-      return ctx.reply('You have no tasks yet. Use /tasks to see what\'s open.');
+    if (applications.length === 0) {
+      return ctx.reply('You have no applications yet. Use /tasks to see what\'s open.');
     }
 
-    const lines = tasks.map((t) => `#${t.id} "${t.title}" - ${t.status}`);
-    await ctx.reply(['Your tasks:', ...lines].join('\n'));
+    const lines = applications.map((a) => {
+      const latest = a.submissions[0];
+      const submissionInfo = latest ? `, latest submission v${latest.version}: ${latest.status}` : '';
+      return `#${a.taskId} "${a.task.title}" - application ${a.status}${submissionInfo}`;
+    });
+
+    await ctx.reply(['Your applications:', ...lines].join('\n'));
   });
 }

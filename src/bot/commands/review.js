@@ -1,11 +1,25 @@
 import { prisma } from '../../db.js';
 import { canManageTask } from '../roomAuth.js';
-import { TASK_STATUS, assertTransition } from '../../workflow.js';
+import {
+  APPLICATION_STATUS,
+  SUBMISSION_STATUS,
+  assertSubmissionTransition,
+  assertApplicationTransition,
+} from '../../workflow.js';
 
-const DECISION_TO_STATUS = {
-  approve: TASK_STATUS.REVIEWED,
-  reject: TASK_STATUS.REJECTED,
-  revise: TASK_STATUS.REVISION_REQUESTED,
+const DECISION_TO_SUBMISSION_STATUS = {
+  approve: SUBMISSION_STATUS.APPROVED,
+  reject: SUBMISSION_STATUS.REJECTED,
+  revise: SUBMISSION_STATUS.NEEDS_REVISION,
+};
+
+// Submission approve/reject cascade to the Application per the spec:
+// approve -> Completed (terminal; slot stays consumed), reject -> Rejected
+// (terminal; slot freed). Revise leaves the Application Assigned so the
+// contributor can submit a new version.
+const DECISION_TO_APPLICATION_STATUS = {
+  approve: APPLICATION_STATUS.COMPLETED,
+  reject: APPLICATION_STATUS.REJECTED,
 };
 
 export function registerReview(bot) {
@@ -15,20 +29,31 @@ export function registerReview(bot) {
     const decision = parts[2]?.toLowerCase();
     const note = parts.slice(3).join(' ').trim() || null;
 
-    if (!id || !DECISION_TO_STATUS[decision]) {
-      return ctx.reply('Usage: /review <task_id> approve|reject|revise [note]');
+    if (!id || !DECISION_TO_SUBMISSION_STATUS[decision]) {
+      return ctx.reply('Usage: /review <application_id> approve|reject|revise [note]');
     }
 
-    const task = await prisma.task.findUnique({ where: { id }, include: { assignedContributor: true } });
-    if (!task) return ctx.reply(`Task #${id} not found.`);
+    const application = await prisma.application.findUnique({
+      where: { id },
+      include: { task: true, contributor: true },
+    });
+    if (!application) return ctx.reply(`Application #${id} not found.`);
 
-    if (!(await canManageTask(ctx, task))) {
+    if (!(await canManageTask(ctx, application.task))) {
       return ctx.reply('Only admins of this task\'s room (or global admins) can review it.');
     }
 
-    const toStatus = DECISION_TO_STATUS[decision];
+    const submission = await prisma.submission.findFirst({
+      where: { applicationId: id },
+      orderBy: { version: 'desc' },
+    });
+    if (!submission) return ctx.reply(`Application #${id} has no submission to review yet.`);
+
+    const toSubmissionStatus = DECISION_TO_SUBMISSION_STATUS[decision];
     try {
-      assertTransition(task.status, toStatus);
+      assertSubmissionTransition(submission.status, toSubmissionStatus);
+      const toApplicationStatus = DECISION_TO_APPLICATION_STATUS[decision];
+      if (toApplicationStatus) assertApplicationTransition(application.status, toApplicationStatus);
     } catch (err) {
       return ctx.reply(`Cannot review: ${err.message}`);
     }
@@ -36,40 +61,62 @@ export function registerReview(bot) {
     // Atomic guard: if another admin reviewed this submission first (even
     // with a conflicting decision), this touches 0 rows instead of both
     // decisions "succeeding" and the contributor getting contradictory DMs.
-    const result = await prisma.task.updateMany({
-      where: { id, status: task.status },
-      data: { status: toStatus, reviewerNote: note },
+    const result = await prisma.submission.updateMany({
+      where: { id: submission.id, status: submission.status },
+      data: { status: toSubmissionStatus, reviewerNote: note },
     });
-
     if (result.count === 0) {
-      const current = await prisma.task.findUnique({ where: { id } });
-      return ctx.reply(`Task #${id} is already ${current.status} - someone else may have just reviewed it.`);
+      return ctx.reply(`Submission v${submission.version} was already reviewed by someone else.`);
     }
 
-    await prisma.taskHistory.create({
-      data: { taskId: id, fromStatus: task.status, toStatus, actorTelegramId: BigInt(ctx.from.id), note },
+    await prisma.submissionHistory.create({
+      data: {
+        submissionId: submission.id,
+        fromStatus: submission.status,
+        toStatus: toSubmissionStatus,
+        actorTelegramId: BigInt(ctx.from.id),
+        note,
+      },
     });
 
-    if (task.assignedContributor && decision === 'reject') {
-      await prisma.contributor.update({
-        where: { id: task.assignedContributor.id },
-        data: { rejectedSubmissionCount: { increment: 1 } },
+    const toApplicationStatus = DECISION_TO_APPLICATION_STATUS[decision];
+    if (toApplicationStatus) {
+      await prisma.application.update({
+        where: { id: application.id },
+        data: { status: toApplicationStatus },
       });
+      await prisma.applicationHistory.create({
+        data: {
+          applicationId: application.id,
+          fromStatus: application.status,
+          toStatus: toApplicationStatus,
+          actorTelegramId: BigInt(ctx.from.id),
+          note,
+        },
+      });
+
+      if (decision === 'approve') {
+        await prisma.contributor.update({
+          where: { id: application.contributorId },
+          data: { completedTaskCount: { increment: 1 } },
+        });
+      } else if (decision === 'reject') {
+        await prisma.contributor.update({
+          where: { id: application.contributorId },
+          data: { rejectedSubmissionCount: { increment: 1 } },
+        });
+      }
     }
 
-    if (task.assignedContributor) {
-      const messages = {
-        approve: `Task #${id} "${task.title}" passed review. It will be finalized shortly (amplify/complete).`,
-        reject: `Task #${id} "${task.title}" was rejected.${note ? ` Reason: ${note}` : ''}`,
-        revise: `Task #${id} "${task.title}" needs revision.${note ? ` Note: ${note}` : ''} Use /submit ${id} <new content> to resubmit.`,
-      };
+    const messages = {
+      approve: `Task #${application.taskId} "${application.task.title}" - your submission was approved. Thank you!`,
+      reject: `Task #${application.taskId} "${application.task.title}" - your submission was rejected.${note ? ` Reason: ${note}` : ''}`,
+      revise: `Task #${application.taskId} "${application.task.title}" needs revision.${note ? ` Note: ${note}` : ''} Use /submit ${application.taskId} <new content> to resubmit.`,
+    };
+    await ctx.telegram
+      .sendMessage(application.contributor.telegramUserId.toString(), messages[decision])
+      .catch(() => {});
 
-      await ctx.telegram
-        .sendMessage(task.assignedContributor.telegramUserId.toString(), messages[decision])
-        .catch(() => {});
-    }
-
-    const nextStep = decision === 'approve' ? ' Use /amplify or /complete next.' : '';
-    await ctx.reply(`Updated task #${id} -> ${toStatus}.${nextStep}`);
+    await ctx.reply(`Reviewed submission v${submission.version} for application #${id} -> ${toSubmissionStatus}${toApplicationStatus ? ` (application -> ${toApplicationStatus})` : ''}.`);
   });
 }

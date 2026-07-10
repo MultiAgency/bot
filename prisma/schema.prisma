@@ -7,18 +7,36 @@ datasource db {
   provider = "postgresql"
 }
 
+// Task:        Draft --approve--> Open --close--> Closed --reopen--> Open
 enum TaskStatus {
-  SIGNAL
   DRAFT
-  APPROVED
-  ROUTED
-  CLAIMED
-  SUBMITTED
-  REVISION_REQUESTED
-  REJECTED
-  REVIEWED
-  AMPLIFIED
+  OPEN
+  CLOSED
+}
+
+// Application: Applied --assign--> Assigned (admin, up to max_assignees)
+//                 |    --decline--> Declined (not selected; may re-apply)
+//                 |    --withdraw--> Withdrawn
+//              Assigned --unassign--> Applied (admin, records a reason)
+//              Assigned --work approved--> Completed (terminal; slot stays consumed)
+//              Assigned --work rejected--> Rejected (terminal; slot freed)
+enum ApplicationStatus {
+  APPLIED
+  ASSIGNED
+  DECLINED
+  WITHDRAWN
   COMPLETED
+  REJECTED
+}
+
+// Submission:  Submitted --approve--> Approved
+//                        --reject---> Rejected (terminal - also closes the assignment)
+//                        --revise---> Needs revision -> contributor submits a new version
+enum SubmissionStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  NEEDS_REVISION
 }
 
 enum SubmissionType {
@@ -55,7 +73,6 @@ model Contributor {
   lastEvaluatedAt         DateTime?
 
   // Reputation / performance
-  claimedTaskCount        Int             @default(0)
   completedTaskCount      Int             @default(0)
   rejectedSubmissionCount Int             @default(0)
   trustStatus             String          @default("unverified")
@@ -63,8 +80,7 @@ model Contributor {
   createdAt               DateTime        @default(now())
   updatedAt               DateTime        @updatedAt
 
-  claimedTasks Task[] @relation("ClaimedTasks")
-  routedTasks  Task[] @relation("RoutedTasks")
+  applications Application[]
 
   @@map("contributors")
 }
@@ -89,52 +105,87 @@ model Signal {
 }
 
 model Task {
-  id                     Int             @id @default(autoincrement())
-  title                   String
-  description             String
-  category                String?
-  requiredSkills          String[]        @default([])
-  reward                  String?
-  deadline                DateTime?
-  requiredOutput          String?
-  status                  TaskStatus      @default(DRAFT)
-  createdByTelegramId     BigInt
+  id                 Int        @id @default(autoincrement())
+  title               String
+  description          String
+  category             String?
+  requiredSkills       String[]   @default([])
+  reward               String?
+  deadline             DateTime?
+  requiredOutput       String?
+  status               TaskStatus @default(DRAFT)
+  // How many applications can be ASSIGNED at once. Most tasks are 1
+  // (single contributor); crowdsourced/parallel tasks can set it higher.
+  maxAssignees         Int        @default(1)
+  createdByTelegramId  BigInt
 
-  signalId                Int?            @unique
-  signal                  Signal?         @relation(fields: [signalId], references: [id])
+  signalId             Int?       @unique
+  signal               Signal?    @relation(fields: [signalId], references: [id])
 
   // The Telegram group this task belongs to, for room-scoped admin
   // permissions. Null means it was created via DM by a global admin.
-  roomId                  Int?
-  room                    Room?           @relation(fields: [roomId], references: [id])
+  roomId               Int?
+  room                 Room?      @relation(fields: [roomId], references: [id])
 
-  // Route step: system-suggested / assigned contributor before claim.
-  // routedAt anchors the claim-lock window (src/scheduler.js) - only
-  // routedContributor can /claim until it expires, then the scheduler
-  // rotates to the next-best candidate or opens the task to everyone.
-  routedContributorId     Int?
-  routedContributor       Contributor?    @relation("RoutedTasks", fields: [routedContributorId], references: [id])
-  matchScore               Float?
-  routedAt                 DateTime?
-  rerouteCount              Int             @default(0)
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
 
-  assignedContributorId   Int?
-  assignedContributor     Contributor?    @relation("ClaimedTasks", fields: [assignedContributorId], references: [id])
+  applications Application[]
+  history      TaskHistory[]
 
-  submissionType          SubmissionType?
-  submissionContent       String?
-  submissionFileId        String?
-  sourceUrl                String?
+  @@map("tasks")
+}
+
+// One contributor's candidacy for one task. A contributor may hold multiple
+// Application rows against the same task over time (e.g. re-applying after
+// being Declined or Unassigned), but only one ACTIVE one (Applied/Assigned)
+// at a time - enforced at the command level, not the schema level.
+model Application {
+  id             Int               @id @default(autoincrement())
+  taskId         Int
+  task           Task              @relation(fields: [taskId], references: [id])
+  contributorId  Int
+  contributor    Contributor       @relation(fields: [contributorId], references: [id])
+  status         ApplicationStatus @default(APPLIED)
+
+  // Match score computed at apply time (src/matching.js), shown to admins
+  // via /applicants to help decide who to /assign.
+  matchScore     Float?
+  unassignReason String?
+
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  submissions Submission[]
+  history     ApplicationHistory[]
+
+  @@map("applications")
+}
+
+// Each resubmission is a new row (version), not an overwrite - so revision
+// history is fully auditable.
+model Submission {
+  id                     Int              @id @default(autoincrement())
+  applicationId          Int
+  application            Application      @relation(fields: [applicationId], references: [id])
+  version                Int
+  status                 SubmissionStatus @default(SUBMITTED)
+
+  submissionType         SubmissionType?
+  submissionContent      String?
+  submissionFileId       String?
+  sourceUrl               String?
   submissionFileMetadata   Json?
   reviewerNote             String?
   aiReviewNote             String?
 
-  createdAt               DateTime        @default(now())
-  updatedAt               DateTime        @updatedAt
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
 
-  history TaskHistory[]
+  history SubmissionHistory[]
 
-  @@map("tasks")
+  @@unique([applicationId, version])
+  @@map("submissions")
 }
 
 // A Telegram group the bot operates in. Auto-created when the bot is
@@ -168,14 +219,40 @@ model RoomAdmin {
 }
 
 model TaskHistory {
-  id              Int        @id @default(autoincrement())
+  id              Int         @id @default(autoincrement())
   taskId          Int
-  task            Task       @relation(fields: [taskId], references: [id])
+  task            Task        @relation(fields: [taskId], references: [id])
   fromStatus      TaskStatus?
   toStatus        TaskStatus
   actorTelegramId BigInt
   note            String?
-  createdAt       DateTime   @default(now())
+  createdAt       DateTime    @default(now())
 
   @@map("task_history")
+}
+
+model ApplicationHistory {
+  id              Int                @id @default(autoincrement())
+  applicationId   Int
+  application     Application        @relation(fields: [applicationId], references: [id])
+  fromStatus      ApplicationStatus?
+  toStatus        ApplicationStatus
+  actorTelegramId BigInt
+  note            String?
+  createdAt       DateTime           @default(now())
+
+  @@map("application_history")
+}
+
+model SubmissionHistory {
+  id              Int               @id @default(autoincrement())
+  submissionId    Int
+  submission      Submission        @relation(fields: [submissionId], references: [id])
+  fromStatus      SubmissionStatus?
+  toStatus        SubmissionStatus
+  actorTelegramId BigInt
+  note            String?
+  createdAt       DateTime          @default(now())
+
+  @@map("submission_history")
 }

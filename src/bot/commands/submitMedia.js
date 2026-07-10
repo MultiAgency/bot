@@ -1,4 +1,4 @@
-import { validateClaimForSubmission, finalizeSubmission } from './submitCore.js';
+import { validateAssignmentForSubmission, finalizeSubmission } from './submitCore.js';
 import { getTaskManagerIds } from '../notifyAdmins.js';
 import { peekPending, clearPending } from '../pendingActions.js';
 
@@ -39,17 +39,17 @@ function registerMediaSubmit(bot, updateType, { submissionType, fileId, submissi
     const parsed = resolveSubmission(ctx);
     if (!parsed) return; // not a submission attempt - ignore silently
 
-    const { task, error } = await validateClaimForSubmission(ctx, parsed.id);
+    const { application, error } = await validateAssignmentForSubmission(ctx, parsed.id);
     if (error) return ctx.reply(error);
 
-    await finalizeSubmission(ctx, task, {
+    await finalizeSubmission(ctx, application, {
       submissionType,
       submissionContent: parsed.note,
       submissionFileId: fileId(ctx),
       submissionFileMetadata: submissionFileMetadata ? submissionFileMetadata(ctx) : null,
     });
 
-    await forwardToTaskManagers(ctx, task);
+    await forwardToTaskManagers(ctx, application.task);
     await ctx.reply(`Submitted your ${label} for task #${parsed.id}. Waiting for reviewer approval.`);
   });
 }

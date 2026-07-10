@@ -1,12 +1,10 @@
 import { prisma } from './db.js';
-import { rankCandidates } from './matching.js';
-import { TASK_STATUS } from './workflow.js';
+import { rankCandidates, computeMatchScore } from './matching.js';
+import { APPLICATION_STATUS } from './workflow.js';
 
-const ACTIVE_STATUSES = [TASK_STATUS.CLAIMED, TASK_STATUS.SUBMITTED, TASK_STATUS.REVISION_REQUESTED];
-
-// Shared by /route (initial routing) and the reroute scheduler
-// (src/scheduler.js): fetches eligible candidates and their current
-// workload, then scores them against the task via matching.js.
+// Shared by the approve-time candidate nudge and /applicants: fetches
+// eligible candidates and their current workload (count of ASSIGNED
+// applications), then scores them against the task via matching.js.
 export async function rankCandidatesForTask(task, { excludeContributorIds = [] } = {}) {
   const candidates = await prisma.contributor.findMany({
     where: {
@@ -15,12 +13,49 @@ export async function rankCandidatesForTask(task, { excludeContributorIds = [] }
     },
   });
 
-  const activeCounts = await prisma.task.groupBy({
-    by: ['assignedContributorId'],
-    where: { status: { in: ACTIVE_STATUSES }, assignedContributorId: { not: null } },
+  const activeCounts = await prisma.application.groupBy({
+    by: ['contributorId'],
+    where: { status: APPLICATION_STATUS.ASSIGNED },
     _count: true,
   });
-  const activeTaskCounts = new Map(activeCounts.map((c) => [c.assignedContributorId, c._count]));
+  const activeTaskCounts = new Map(activeCounts.map((c) => [c.contributorId, c._count]));
 
   return rankCandidates(task, candidates, activeTaskCounts);
+}
+
+// Ranks a specific task's Applied applications (not the whole registered
+// pool) by match score, for /applicants to help an admin decide who to
+// /assign.
+export async function rankApplicationsForTask(task) {
+  const applications = await prisma.application.findMany({
+    where: { taskId: task.id, status: APPLICATION_STATUS.APPLIED },
+    include: { contributor: true },
+  });
+
+  const activeCounts = await prisma.application.groupBy({
+    by: ['contributorId'],
+    where: { status: APPLICATION_STATUS.ASSIGNED },
+    _count: true,
+  });
+  const activeTaskCounts = new Map(activeCounts.map((c) => [c.contributorId, c._count]));
+
+  const ranked = rankCandidates(
+    task,
+    applications.map((a) => a.contributor),
+    activeTaskCounts
+  );
+
+  const scoreByContributorId = new Map(ranked.map((r) => [r.contributor.id, r.score]));
+  return applications
+    .map((a) => ({ application: a, score: scoreByContributorId.get(a.contributorId) ?? null }))
+    .sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+}
+
+// Single-candidate score for /apply, so the applicant's matchScore is
+// stored even though they aren't being ranked against the full pool.
+export async function scoreApplicant(task, contributor) {
+  const activeCount = await prisma.application.count({
+    where: { contributorId: contributor.id, status: APPLICATION_STATUS.ASSIGNED },
+  });
+  return computeMatchScore(task, contributor, activeCount);
 }

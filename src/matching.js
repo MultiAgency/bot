@@ -66,15 +66,14 @@ export function isRoutable(contributor) {
   return contributor.eligibilityTier !== 'RESTRICTED';
 }
 
-// activeTaskCounts: optional Map<contributorId, number> of currently in-flight
-// tasks (CLAIMED/SUBMITTED/REVISION_REQUESTED). Falls back to a rough estimate
-// from claimed/completed counters when not supplied by the caller.
+// activeTaskCounts: Map<contributorId, number> of currently ASSIGNED
+// applications (src/routing.js computes this from real data). Contributors
+// missing from the map are assumed to have none.
 export function rankCandidates(task, candidates, activeTaskCounts = new Map()) {
   return candidates
     .filter(isRoutable)
     .map((c) => {
-      const activeTaskCount =
-        activeTaskCounts.get(c.id) ?? Math.max(0, c.claimedTaskCount - c.completedTaskCount);
+      const activeTaskCount = activeTaskCounts.get(c.id) ?? 0;
       return { contributor: c, score: computeMatchScore(task, c, activeTaskCount) };
     })
     .sort((a, b) => b.score - a.score);

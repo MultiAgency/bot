@@ -15,27 +15,29 @@ async function downloadTelegramFile(ctx, fileId) {
 }
 
 // Best-effort automated pre-review for a human reviewer, branched by
-// submission type. Returns null when there's nothing to analyze (e.g. no
-// content, or a file type we don't support yet) - callers should treat that
-// as "no AI note", not an error. Never approves/rejects anything itself.
-export async function reviewSubmission(ctx, task) {
-  if (task.submissionType === 'TEXT' || task.submissionType === 'LINK') {
-    const content = task.submissionFileMetadata?.convertedText || task.submissionContent;
+// submission type. `submission` carries the content/file fields, `task`
+// carries the title/description/requiredOutput context. Returns null when
+// there's nothing to analyze (e.g. no content, or a file type we don't
+// support yet) - callers should treat that as "no AI note", not an error.
+// Never approves/rejects anything itself.
+export async function reviewSubmission(ctx, submission, task) {
+  if (submission.submissionType === 'TEXT' || submission.submissionType === 'LINK') {
+    const content = submission.submissionFileMetadata?.convertedText || submission.submissionContent;
     if (!content) return null;
     return summarizeSubmission(content, task);
   }
 
-  if (task.submissionType === 'SCREENSHOT' && task.submissionFileId) {
-    const file = await downloadTelegramFile(ctx, task.submissionFileId);
+  if (submission.submissionType === 'SCREENSHOT' && submission.submissionFileId) {
+    const file = await downloadTelegramFile(ctx, submission.submissionFileId);
     if (!file) return null;
     return reviewSubmissionImage(file.buffer.toString('base64'), file.contentType || 'image/jpeg', task);
   }
 
-  if (task.submissionType === 'FILE' && task.submissionFileId) {
-    const mimeType = task.submissionFileMetadata?.mimeType;
+  if (submission.submissionType === 'FILE' && submission.submissionFileId) {
+    const mimeType = submission.submissionFileMetadata?.mimeType;
 
     if (mimeType === 'application/pdf') {
-      const file = await downloadTelegramFile(ctx, task.submissionFileId);
+      const file = await downloadTelegramFile(ctx, submission.submissionFileId);
       if (!file) return null;
       return reviewSubmissionDocument(file.buffer.toString('base64'), task);
     }
@@ -43,7 +45,7 @@ export async function reviewSubmission(ctx, task) {
     // .docx and plain-text-ish files are extracted locally (no API cost,
     // no external service) and reviewed as text, same as a text submission.
     if (mimeType === DOCX_MIME_TYPE) {
-      const file = await downloadTelegramFile(ctx, task.submissionFileId);
+      const file = await downloadTelegramFile(ctx, submission.submissionFileId);
       if (!file) return null;
       const { value: text } = await mammoth.extractRawText({ buffer: file.buffer });
       if (!text?.trim()) return null;
@@ -51,7 +53,7 @@ export async function reviewSubmission(ctx, task) {
     }
 
     if (mimeType && PLAIN_TEXT_MIME_TYPES.has(mimeType)) {
-      const file = await downloadTelegramFile(ctx, task.submissionFileId);
+      const file = await downloadTelegramFile(ctx, submission.submissionFileId);
       if (!file) return null;
       const text = file.buffer.toString('utf-8');
       if (!text.trim()) return null;

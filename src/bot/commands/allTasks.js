@@ -1,7 +1,7 @@
 import { prisma } from '../../db.js';
 import { isAdmin } from '../roomAuth.js';
 import { listRoomIdsForAdmin } from '../../rooms.js';
-import { TASK_STATUS } from '../../workflow.js';
+import { TASK_STATUS, APPLICATION_STATUS } from '../../workflow.js';
 
 export function registerAllTasks(bot) {
   bot.command('alltasks', async (ctx) => {
@@ -24,7 +24,7 @@ export function registerAllTasks(bot) {
 
     const tasks = await prisma.task.findMany({
       where,
-      include: { assignedContributor: true },
+      include: { applications: true },
       orderBy: { updatedAt: 'desc' },
       take: 30,
     });
@@ -34,10 +34,8 @@ export function registerAllTasks(bot) {
     }
 
     const lines = tasks.map((t) => {
-      const assignee = t.assignedContributor
-        ? ` (${t.assignedContributor.displayName || t.assignedContributor.telegramUsername})`
-        : '';
-      return `#${t.id} "${t.title}" - ${t.status}${assignee}`;
+      const assignedCount = t.applications.filter((a) => a.status === APPLICATION_STATUS.ASSIGNED).length;
+      return `#${t.id} "${t.title}" - ${t.status} (${assignedCount}/${t.maxAssignees} assigned)`;
     });
 
     await ctx.reply([`Tasks${statusArg ? ` (${statusArg})` : ''}:`, ...lines].join('\n'));

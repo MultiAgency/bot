@@ -1,5 +1,5 @@
 import { peekPending, clearPending } from '../pendingActions.js';
-import { validateClaimForSubmission, submitTextOrLink, replyForTextSubmission } from './submitCore.js';
+import { validateAssignmentForSubmission, submitTextOrLink, replyForTextSubmission } from './submitCore.js';
 import { handleNewTaskWizardStep } from './newTaskCore.js';
 
 // Dispatches a plain (non-command) text message to whichever pending
@@ -22,10 +22,10 @@ export function registerPendingTextDispatcher(bot) {
 
     if (entry.type === 'submission') {
       clearPending(ctx.from.id);
-      const { task, error } = await validateClaimForSubmission(ctx, entry.data.taskId);
+      const { application, error } = await validateAssignmentForSubmission(ctx, entry.data.taskId);
       if (error) return ctx.reply(error);
 
-      const submissionFileMetadata = await submitTextOrLink(ctx, task, ctx.message.text.trim());
+      const submissionFileMetadata = await submitTextOrLink(ctx, application, ctx.message.text.trim());
       return replyForTextSubmission(ctx, entry.data.taskId, submissionFileMetadata);
     }
 

@@ -1,4 +1,4 @@
-import { validateClaimForSubmission, submitTextOrLink, replyForTextSubmission } from './submitCore.js';
+import { validateAssignmentForSubmission, submitTextOrLink, replyForTextSubmission } from './submitCore.js';
 import { setPending } from '../pendingActions.js';
 
 export function registerSubmit(bot) {
@@ -14,7 +14,7 @@ export function registerSubmit(bot) {
       );
     }
 
-    const { task, error } = await validateClaimForSubmission(ctx, id);
+    const { application, error } = await validateAssignmentForSubmission(ctx, id);
     if (error) return ctx.reply(error);
 
     if (!content) {
@@ -24,7 +24,7 @@ export function registerSubmit(bot) {
       );
     }
 
-    const submissionFileMetadata = await submitTextOrLink(ctx, task, content);
+    const submissionFileMetadata = await submitTextOrLink(ctx, application, content);
     await replyForTextSubmission(ctx, id, submissionFileMetadata);
   });
 }

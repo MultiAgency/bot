@@ -1,40 +1,87 @@
+// Three independent state machines: a Task's lifecycle is separate from any
+// individual contributor's Application against it, which is separate from
+// each Submission (a versioned attempt) under that application.
+
 export const TASK_STATUS = {
-  SIGNAL: 'SIGNAL',
   DRAFT: 'DRAFT',
-  APPROVED: 'APPROVED',
-  ROUTED: 'ROUTED',
-  CLAIMED: 'CLAIMED',
-  SUBMITTED: 'SUBMITTED',
-  REVISION_REQUESTED: 'REVISION_REQUESTED',
-  REJECTED: 'REJECTED',
-  REVIEWED: 'REVIEWED',
-  AMPLIFIED: 'AMPLIFIED',
-  COMPLETED: 'COMPLETED',
+  OPEN: 'OPEN',
+  CLOSED: 'CLOSED',
 };
 
-// Signal/request -> Reason&draft -> Human approval -> Route -> Claim -> Submit
-// -> Review -> Amplify -> Completed, with Rejected / Revision-Requested
-// branches off Submitted, and Amplify optional before Completed.
-const ALLOWED_TRANSITIONS = {
-  SIGNAL: ['DRAFT'],
-  DRAFT: ['APPROVED'],
-  APPROVED: ['ROUTED'],
-  ROUTED: ['CLAIMED'],
-  CLAIMED: ['SUBMITTED'],
-  SUBMITTED: ['REVIEWED', 'REJECTED', 'REVISION_REQUESTED'],
-  REVISION_REQUESTED: ['SUBMITTED'],
-  REVIEWED: ['AMPLIFIED', 'COMPLETED'],
-  AMPLIFIED: ['COMPLETED'],
-  REJECTED: [],
-  COMPLETED: [],
+// Draft -> Open -> Closed -> (reopen) -> Open
+const TASK_TRANSITIONS = {
+  DRAFT: ['OPEN'],
+  OPEN: ['CLOSED'],
+  CLOSED: ['OPEN'],
 };
 
-export function canTransition(from, to) {
-  return ALLOWED_TRANSITIONS[from]?.includes(to) ?? false;
+export function canTransitionTask(from, to) {
+  return TASK_TRANSITIONS[from]?.includes(to) ?? false;
 }
 
-export function assertTransition(from, to) {
-  if (!canTransition(from, to)) {
+export function assertTaskTransition(from, to) {
+  if (!canTransitionTask(from, to)) {
     throw new Error(`Invalid task transition: ${from} -> ${to}`);
+  }
+}
+
+export const APPLICATION_STATUS = {
+  APPLIED: 'APPLIED',
+  ASSIGNED: 'ASSIGNED',
+  DECLINED: 'DECLINED',
+  WITHDRAWN: 'WITHDRAWN',
+  COMPLETED: 'COMPLETED',
+  REJECTED: 'REJECTED',
+};
+
+// Applied -> Assigned (admin, up to max_assignees)
+// Applied -> Declined (not selected; may re-apply as a new Application)
+// Applied -> Withdrawn
+// Assigned -> Applied (admin unassign, records a reason)
+// Assigned -> Completed (terminal; slot stays consumed)
+// Assigned -> Rejected (terminal; slot freed)
+const APPLICATION_TRANSITIONS = {
+  APPLIED: ['ASSIGNED', 'DECLINED', 'WITHDRAWN'],
+  ASSIGNED: ['APPLIED', 'COMPLETED', 'REJECTED'],
+  DECLINED: [],
+  WITHDRAWN: [],
+  COMPLETED: [],
+  REJECTED: [],
+};
+
+export function canTransitionApplication(from, to) {
+  return APPLICATION_TRANSITIONS[from]?.includes(to) ?? false;
+}
+
+export function assertApplicationTransition(from, to) {
+  if (!canTransitionApplication(from, to)) {
+    throw new Error(`Invalid application transition: ${from} -> ${to}`);
+  }
+}
+
+export const SUBMISSION_STATUS = {
+  SUBMITTED: 'SUBMITTED',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  NEEDS_REVISION: 'NEEDS_REVISION',
+};
+
+// Submitted -> Approved
+// Submitted -> Rejected (terminal - also closes the assignment)
+// Submitted -> Needs revision -> contributor submits a new version (a new Submission row)
+const SUBMISSION_TRANSITIONS = {
+  SUBMITTED: ['APPROVED', 'REJECTED', 'NEEDS_REVISION'],
+  APPROVED: [],
+  REJECTED: [],
+  NEEDS_REVISION: [],
+};
+
+export function canTransitionSubmission(from, to) {
+  return SUBMISSION_TRANSITIONS[from]?.includes(to) ?? false;
+}
+
+export function assertSubmissionTransition(from, to) {
+  if (!canTransitionSubmission(from, to)) {
+    throw new Error(`Invalid submission transition: ${from} -> ${to}`);
   }
 }
