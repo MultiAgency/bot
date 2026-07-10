@@ -22,6 +22,7 @@ import { registerDrafts } from './commands/drafts.js';
 import { registerSignalChatAdmin } from './commands/signalChatAdmin.js';
 import { registerRoomAdmin } from './commands/roomAdmin.js';
 import { registerPendingTextDispatcher } from './commands/pendingTextDispatcher.js';
+import { registerMentionReply } from './commands/mentionReply.js';
 import { registerSignalListener } from './commands/signalListener.js';
 
 export function createBot(token) {
@@ -53,6 +54,9 @@ export function createBot(token) {
   // flow (submission, /newtask wizard) should never be treated as a chat
   // signal. It calls next() for anything that isn't its concern.
   registerPendingTextDispatcher(bot);
+  // Acknowledges an @mention in a group so it never looks like the bot is
+  // ignoring people; calls next() so signal detection still gets a look.
+  registerMentionReply(bot);
   // Must be registered last: it's a catch-all `on('text')` listener and
   // would otherwise shadow unmatched-command fallthrough to other handlers.
   registerSignalListener(bot);

@@ -16,7 +16,8 @@ Stack: **Telegraf (long polling) + Prisma + Postgres on Neon + Railway**. No pub
 2. Send `/newbot`, follow the prompts (choose a name and a `_bot`-suffixed username)
 3. BotFather replies with a token like `123456789:AAExampleTokenValue` — save it, this is `BOT_TOKEN`
 4. Send `/start` to your new bot from your own Telegram account, then get your numeric Telegram user ID (e.g. via [@userinfobot](https://t.me/userinfobot)) — this becomes your `ADMIN_TELEGRAM_IDS` value
-5. **Only if you want auto-drafted tasks from group chat (signal detection):** send BotFather `/setprivacy`, select your bot, choose **Disable**. This lets the bot see every message in groups it's added to, not just commands — make sure group members are aware before enabling. Skip this step if you only plan to use explicit commands. (Enabling it per group is done later, at runtime, via `/enablesignals` — no extra env var or redeploy needed.)
+5. **Only if you want auto-drafted tasks from group chat (signal detection), or the bot to acknowledge @mentions:** send BotFather `/setprivacy`, select your bot, choose **Disable**. This lets the bot see every message in groups it's added to, not just commands — make sure group members are aware before enabling. Skip this step if you only plan to use explicit commands. (Enabling signal detection per group is done later, at runtime, via `/enablesignals` — no extra env var or redeploy needed.)
+6. **If the bot is already in the target group, remove it and re-add it after step 5.** Telegram only applies a new Privacy Mode setting when the bot (re-)joins a chat — this is the #1 cause of "I disabled privacy mode but nothing changed." Do this once per group where you need it.
 
 ## 3. Create the database (Neon)
 
