@@ -57,10 +57,25 @@ Pipeline per message: a cheap length/word-count pre-filter runs first (no API co
 
 `/register <twitter_handle>` marks a contributor `isRegistered` and computes:
 - `telegramScore` — real signal from profile completeness + in-system track record (`src/candidateEvaluation.js`)
-- `twitterScore` — stubbed until `TWITTER_BEARER_TOKEN` is configured (returns `null`, not fabricated)
+- `twitterScore` — see below
 - `socialTrustScore` / `eligibilityTier` — derived from the above
 
 Only registered contributors can `/claim` tasks.
+
+### Twitter/X scoring (cookie-based, unofficial)
+
+`twitterScore` uses **cookie-based profile access** (`src/twitterClient.js`, via `@the-convocation/twitter-scraper`), not the official paid X API. This was a deliberate choice to avoid the API's cost, but it comes with real, non-hypothetical risks:
+
+- **Violates X's Terms of Service** — automated access outside the official API is explicitly against X's ToS.
+- **The logged-in account can be suspended at any time**, with no warning and no appeal guaranteed.
+- **Breaks whenever X changes its internal endpoints** — no SLA, no advance notice; fixes depend on the open-source library catching up.
+- **The cookie is a live session credential** — whoever holds it can act as that account (post, DM, etc.), not just read profiles. Keep it in `TWITTER_COOKIES` (env var) only, never commit it.
+
+**Use a dedicated/throwaway X account for this, not the project's main brand account.** If that account gets suspended, `twitterScore` just goes back to `null` (unscored) — `computeTwitterScore` never throws and never fabricates a score, so the rest of the pipeline (registration, matching, routing) keeps working either way.
+
+Scoring is a lightweight heuristic over public profile fields (account age, tweet count, follower/following ratio, verified status) — not the richer signals (engagement rate, content relevance) the official API would give. See `scoreTwitterProfile` in `src/candidateEvaluation.js`.
+
+To get `TWITTER_COOKIES`: log into the throwaway account in a browser, export its cookies (e.g. via a browser extension like "Cookie-Editor" or your devtools' Application/Storage panel) as a JSON array of `"name=value; Domain=..."` strings, and set that as the env var.
 
 ## Matching engine
 
@@ -110,11 +125,11 @@ Two problems come up once a group has more than one admin: two admins acting on 
 
 ## Not done yet
 
+**Decided, not just deferred: Telegram is the only signal source for now.** Twitter, Discord, GitHub, and news would each need their own credential/service decision (a Discord bot token, a GitHub App, a news API — Twitter itself is covered for *candidate scoring* via cookies, see above, but not wired up as a *signal source*). Revisit if/when there's a concrete need.
+
 Genuinely blocked on a decision or resource this repo can't provide on its own:
 
-- **Real Twitter/X API scoring** — needs a paid API tier decision (which tier, whose account/budget). `computeTwitterScore` in `src/candidateEvaluation.js` is a ready-to-fill stub that returns `null` (unscored) rather than fabricating a score until that's chosen.
-- **Non-Telegram signal sources** (Twitter, Discord, GitHub, news) — each needs its own credential/service decision (X API, a Discord bot token, a GitHub App, a news API). Only in-chat Telegram messages are watched today.
-- **AI review of video submissions** — a real Claude API limitation, Claude has no video input at all. (Document coverage was extended below at no extra cost — video is the one that's actually stuck.)
+- **AI review of video submissions** — a real Claude API limitation, Claude has no video input at all. (Document coverage was extended at no extra cost — video is the one that's actually stuck.)
 
 Smaller known limitations:
 
@@ -122,4 +137,5 @@ Smaller known limitations:
 - Two-step submission and the `/newtask` wizard use in-memory pending state (`src/bot/pendingActions.js`) — resets on restart/redeploy, and doesn't work across multiple bot instances (not an issue at the current single-instance scale, see DEPLOY.md).
 - AI review still doesn't cover every document type (legacy `.doc`, `.xlsx`, etc.) — only PDF (via Claude) and `.docx`/`.txt`/`.md`/`.csv` (via local extraction) are wired up. Same pattern, just needs the right library per format.
 - `/mytasks` and `/alltasks` are capped at the 20-30 most recently updated tasks with no pagination — fine at pilot scale, but older tasks will scroll out of view once volume grows.
+- Twitter cookie-based scoring (see [Candidate evaluation](#candidate-evaluation)) is unofficial and can stop working at any time if X changes its internal endpoints or the linked account gets suspended — `twitterScore` falls back to `null` when that happens, it doesn't crash anything.
 - `/mytasks` has no status filter (unlike `/alltasks [status]`) — for a contributor with many tasks there's no way to narrow the list yet.

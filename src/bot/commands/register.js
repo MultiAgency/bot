@@ -24,7 +24,7 @@ export function registerRegister(bot) {
     });
 
     const { telegramScore, twitterScore, socialTrustScore, eligibilityTier } =
-      evaluateCandidate(contributor);
+      await evaluateCandidate(contributor);
 
     await prisma.contributor.update({
       where: { id: contributor.id },
@@ -43,7 +43,7 @@ export function registerRegister(bot) {
         `Registered @${twitterHandle}. Initial trust tier: ${eligibilityTier}.`,
         `Telegram score: ${telegramScore.toFixed(2)}`,
         twitterScore == null
-          ? 'Twitter score: pending (Twitter evaluation not yet configured on this deployment)'
+          ? 'Twitter score: unavailable (not configured on this deployment, or the profile couldn\'t be found)'
           : `Twitter score: ${twitterScore.toFixed(2)}`,
         `Social trust score: ${socialTrustScore.toFixed(2)}`,
         '',

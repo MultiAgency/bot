@@ -45,7 +45,7 @@ Stack: **Telegraf (long polling) + Prisma + Postgres on Neon + Railway**. No pub
    | `DATABASE_URL` | from step 3 |
    | `ANTHROPIC_API_KEY` | from step 4 |
    | `JINA_API_KEY` | optional, leave blank to use the free keyless tier |
-   | `TWITTER_BEARER_TOKEN` | optional, leave blank (Twitter scoring stays stubbed) |
+   | `TWITTER_COOKIES` | optional, leave blank to keep `twitterScore` unscored. If set, use a **dedicated/throwaway X account** — see README.md "Candidate evaluation" for why (ToS/ban risk) |
    | `SIGNAL_SCORE_THRESHOLD` | optional, defaults to `6` |
    | `SIGNAL_MAX_PER_HOUR` | optional, defaults to `20` |
    | `ROUTE_LOCK_MINUTES` | optional, defaults to `30` |
