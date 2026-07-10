@@ -16,6 +16,7 @@ Stack: **Telegraf (long polling) + Prisma + Postgres on Neon + Railway**. No pub
 2. Send `/newbot`, follow the prompts (choose a name and a `_bot`-suffixed username)
 3. BotFather replies with a token like `123456789:AAExampleTokenValue` — save it, this is `BOT_TOKEN`
 4. Send `/start` to your new bot from your own Telegram account, then get your numeric Telegram user ID (e.g. via [@userinfobot](https://t.me/userinfobot)) — this becomes your `ADMIN_TELEGRAM_IDS` value
+5. **Only if you want auto-drafted tasks from group chat (signal detection):** send BotFather `/setprivacy`, select your bot, choose **Disable**. This lets the bot see every message in groups it's added to, not just commands — make sure group members are aware before enabling. Skip this step if you only plan to use explicit commands.
 
 ## 3. Create the database (Neon)
 
@@ -45,6 +46,9 @@ Stack: **Telegraf (long polling) + Prisma + Postgres on Neon + Railway**. No pub
    | `ANTHROPIC_API_KEY` | from step 4 |
    | `JINA_API_KEY` | optional, leave blank to use the free keyless tier |
    | `TWITTER_BEARER_TOKEN` | optional, leave blank (Twitter scoring stays stubbed) |
+   | `SIGNAL_CHAT_IDS` | optional, leave blank to keep signal detection off; set to enable auto-drafting from group chat (requires step 2.5 above) |
+   | `SIGNAL_SCORE_THRESHOLD` | optional, defaults to `6` |
+   | `SIGNAL_MAX_PER_HOUR` | optional, defaults to `20` |
 
 4. Trigger a deploy (Railway redeploys automatically after variables are saved). On startup, `npm start` runs `prisma migrate deploy` against `DATABASE_URL` before launching the bot — tables are created automatically on first deploy.
 5. Check **Deployments → View Logs**; you should see `Bot is running (long polling).`

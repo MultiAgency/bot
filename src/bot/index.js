@@ -11,6 +11,7 @@ import { registerReview } from './commands/review.js';
 import { registerAmplify } from './commands/amplify.js';
 import { registerComplete } from './commands/complete.js';
 import { registerStatus } from './commands/status.js';
+import { registerSignalListener } from './commands/signalListener.js';
 
 export function createBot(token) {
   const bot = new Telegraf(token);
@@ -27,6 +28,9 @@ export function createBot(token) {
   registerAmplify(bot);
   registerComplete(bot);
   registerStatus(bot);
+  // Must be registered last: it's a catch-all `on('text')` listener and
+  // would otherwise shadow unmatched-command fallthrough to other handlers.
+  registerSignalListener(bot);
 
   bot.catch((err, ctx) => {
     console.error(`Bot error for update ${ctx.update.update_id}:`, err);

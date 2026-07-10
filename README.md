@@ -35,7 +35,18 @@ Admin (must be listed in `ADMIN_TELEGRAM_IDS`):
 SIGNAL → DRAFT → APPROVED → ROUTED → CLAIMED → SUBMITTED → REVIEWED → AMPLIFIED → COMPLETED
 ```
 
-`SUBMITTED` also branches to `REJECTED` or `REVISION_REQUESTED` (loops back to `SUBMITTED` after resubmission). `REVIEWED` can go straight to `COMPLETED` if amplification isn't needed. Transition logic lives in `src/workflow.js`. `SIGNAL` exists in the schema for a future automated signal collector (Stage 2); `/newtask` currently creates a task directly in `DRAFT`.
+`SUBMITTED` also branches to `REJECTED` or `REVISION_REQUESTED` (loops back to `SUBMITTED` after resubmission). `REVIEWED` can go straight to `COMPLETED` if amplification isn't needed. Transition logic lives in `src/workflow.js`. `/newtask` creates a task directly in `DRAFT`; tasks auto-drafted from chat signals (see below) are linked back to their `Signal` record via `Task.signalId`.
+
+## Signal detection (auto-drafting tasks from chat)
+
+The bot can passively watch group chats and auto-draft a task when a message looks like a real opportunity (`src/signalDetection.js` + `evaluateSignal` in `src/ai/claude.js`). It never auto-approves — auto-drafted tasks land in `DRAFT` exactly like `/newtask`, and an admin still has to `/approve` them.
+
+**Disabled by default.** To enable it for a chat:
+1. Message [@BotFather](https://t.me/BotFather) → `/setprivacy` → select your bot → **Disable**. By default Telegram only delivers commands/mentions to bots in groups; disabling privacy mode lets it see all messages (existing group members must be aware of this).
+2. Add the bot to the group, get the chat's numeric ID (e.g. forward a message from the group to [@userinfobot](https://t.me/userinfobot), or check bot logs — group chat IDs are negative numbers).
+3. Set `SIGNAL_CHAT_IDS` to that ID (comma-separated for multiple chats).
+
+Pipeline per message: a cheap length/word-count pre-filter runs first (no API cost), then a per-chat rate limit (`SIGNAL_MAX_PER_HOUR`, default 20/hour, in-memory — resets on restart), then Claude (Haiku) scores it 0–10 and drafts a title/description/category/skills if it clears `SIGNAL_SCORE_THRESHOLD` (default 6). Every evaluated message is stored as a `Signal` row regardless of outcome (`status: DRAFTED` or `DISCARDED`), so discarded signals stay auditable.
 
 ## Candidate evaluation
 
@@ -56,5 +67,6 @@ Only registered contributors can `/claim` tasks.
 - Multi-step wizard for `/newtask` (currently a single-line, `|`-delimited syntax)
 - Wiring `suggestTaskDescription` / `summarizeSubmission` (`src/ai/claude.js`) into the task-creation / review flow
 - Real Twitter/X API scoring (needs a paid API tier decision — see `computeTwitterScore` in `src/candidateEvaluation.js`)
-- Automated signal collection (`Signal` model exists but nothing populates it yet)
 - Hard routing locks / reroute-on-timeout (needs a scheduler)
+- Signal rate-limit counters are in-memory only (reset on restart/redeploy, not shared across instances)
+- Non-Telegram signal sources (Twitter, Discord, GitHub, news) — only in-chat messages are watched today
