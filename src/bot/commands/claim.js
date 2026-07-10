@@ -6,19 +6,17 @@ export function registerClaim(bot) {
     const id = Number(ctx.message.text.split(' ')[1]);
     if (!id) return ctx.reply('Usage: /claim <task_id>');
 
-    const contributor = await prisma.contributor.upsert({
+    const contributor = await prisma.contributor.findUnique({
       where: { telegramUserId: BigInt(ctx.from.id) },
-      update: {},
-      create: {
-        telegramUserId: BigInt(ctx.from.id),
-        telegramUsername: ctx.from.username ?? null,
-        displayName: [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' '),
-      },
     });
 
-    // Atomic claim: only succeeds if the task is still OPEN, preventing double-claims.
+    if (!contributor?.isRegistered) {
+      return ctx.reply('You need to /register <twitter_handle> before claiming tasks.');
+    }
+
+    // Atomic claim: only succeeds if the task is still ROUTED, preventing double-claims.
     const claimed = await prisma.task.updateMany({
-      where: { id, status: TASK_STATUS.OPEN },
+      where: { id, status: TASK_STATUS.ROUTED },
       data: { status: TASK_STATUS.CLAIMED, assignedContributorId: contributor.id },
     });
 
@@ -29,7 +27,7 @@ export function registerClaim(bot) {
     await prisma.taskHistory.create({
       data: {
         taskId: id,
-        fromStatus: TASK_STATUS.OPEN,
+        fromStatus: TASK_STATUS.ROUTED,
         toStatus: TASK_STATUS.CLAIMED,
         actorTelegramId: BigInt(ctx.from.id),
       },

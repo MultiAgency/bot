@@ -20,7 +20,8 @@ export function registerStart(bot) {
       'Welcome to the MultiAgency Contributor Bot!',
       '',
       'Contributor commands:',
-      '/tasks - view open tasks',
+      '/register <twitter_handle> - register and get evaluated before you can claim tasks',
+      '/tasks - view routed/open tasks',
       '/claim <id> - claim a task',
       '/submit <id> <content or link> - submit your result',
       '/status <id> - view task status',
@@ -31,8 +32,11 @@ export function registerStart(bot) {
         '',
         'Admin commands:',
         '/newtask <title> | <description> | <reward> | <required output> - create a task (Draft)',
-        '/approve <id> - approve a task (Draft -> Open)',
+        '/approve <id> - approve a task (Draft -> Approved)',
+        '/route <id> - match candidates and open the task (Approved -> Routed)',
         '/review <id> approve|reject|revise [note] - handle a submission',
+        '/amplify <id> [note] - mark a reviewed task as amplified',
+        '/complete <id> - close out a task (updates contributor stats)',
       );
     }
 

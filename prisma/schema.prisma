@@ -8,14 +8,16 @@ datasource db {
 }
 
 enum TaskStatus {
+  SIGNAL
   DRAFT
   APPROVED
-  OPEN
+  ROUTED
   CLAIMED
   SUBMITTED
   REVISION_REQUESTED
   REJECTED
   REVIEWED
+  AMPLIFIED
   COMPLETED
 }
 
@@ -26,40 +28,90 @@ enum SubmissionType {
   SCREENSHOT
 }
 
+enum EligibilityTier {
+  NEW
+  VERIFIED
+  TRUSTED
+  HIGH_TRUST
+  RESTRICTED
+}
+
 model Contributor {
-  id                      Int      @id @default(autoincrement())
-  telegramUserId          BigInt   @unique
+  id                      Int             @id @default(autoincrement())
+  telegramUserId          BigInt          @unique
   telegramUsername        String?
   displayName             String?
-  claimedTaskCount        Int      @default(0)
-  completedTaskCount      Int      @default(0)
-  rejectedSubmissionCount Int      @default(0)
-  trustStatus             String   @default("unverified")
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
 
-  tasks Task[]
+  // Registration / onboarding (candidate evaluation via Twitter + Telegram)
+  twitterHandle           String?
+  isRegistered            Boolean         @default(false)
+  eligibilityTier         EligibilityTier @default(NEW)
+  twitterScore            Float?
+  telegramScore           Float?
+  socialTrustScore        Float?
+  riskFlags               String[]        @default([])
+  skillTags               String[]        @default([])
+  preferredCategories     String[]        @default([])
+  lastEvaluatedAt         DateTime?
+
+  // Reputation / performance
+  claimedTaskCount        Int             @default(0)
+  completedTaskCount      Int             @default(0)
+  rejectedSubmissionCount Int             @default(0)
+  trustStatus             String          @default("unverified")
+
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+
+  claimedTasks Task[] @relation("ClaimedTasks")
+  routedTasks  Task[] @relation("RoutedTasks")
 
   @@map("contributors")
+}
+
+model Signal {
+  id                  Int      @id @default(autoincrement())
+  source              String
+  summary              String
+  rawText              String?
+  status               String   @default("NEW")
+  createdByTelegramId  BigInt
+  createdAt            DateTime @default(now())
+
+  task Task?
+
+  @@map("signals")
 }
 
 model Task {
   id                     Int             @id @default(autoincrement())
   title                   String
   description             String
+  category                String?
+  requiredSkills          String[]        @default([])
   reward                  String?
   deadline                DateTime?
   requiredOutput          String?
   status                  TaskStatus      @default(DRAFT)
   createdByTelegramId     BigInt
 
+  signalId                Int?            @unique
+  signal                  Signal?         @relation(fields: [signalId], references: [id])
+
+  // Route step: system-suggested / assigned contributor before claim
+  routedContributorId     Int?
+  routedContributor       Contributor?    @relation("RoutedTasks", fields: [routedContributorId], references: [id])
+  matchScore               Float?
+
   assignedContributorId   Int?
-  assignedContributor     Contributor?    @relation(fields: [assignedContributorId], references: [id])
+  assignedContributor     Contributor?    @relation("ClaimedTasks", fields: [assignedContributorId], references: [id])
 
   submissionType          SubmissionType?
   submissionContent       String?
   submissionFileId        String?
-  reviewerNote            String?
+  sourceUrl                String?
+  submissionFileMetadata   Json?
+  reviewerNote             String?
 
   createdAt               DateTime        @default(now())
   updatedAt               DateTime        @updatedAt

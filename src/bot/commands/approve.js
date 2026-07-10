@@ -16,7 +16,6 @@ export function registerApprove(bot) {
 
     try {
       assertTransition(task.status, TASK_STATUS.APPROVED);
-      assertTransition(TASK_STATUS.APPROVED, TASK_STATUS.OPEN);
     } catch (err) {
       return ctx.reply(`Cannot approve: ${err.message}`);
     }
@@ -24,16 +23,13 @@ export function registerApprove(bot) {
     await prisma.task.update({
       where: { id },
       data: {
-        status: TASK_STATUS.OPEN,
+        status: TASK_STATUS.APPROVED,
         history: {
-          create: [
-            { toStatus: TASK_STATUS.APPROVED, actorTelegramId: BigInt(ctx.from.id) },
-            { toStatus: TASK_STATUS.OPEN, actorTelegramId: BigInt(ctx.from.id) },
-          ],
+          create: { toStatus: TASK_STATUS.APPROVED, actorTelegramId: BigInt(ctx.from.id) },
         },
       },
     });
 
-    await ctx.reply(`Task #${id} has been approved and opened for contributors (use /tasks to view).`);
+    await ctx.reply(`Task #${id} approved. Use /route ${id} to match it with a contributor and open it up.`);
   });
 }

@@ -1,5 +1,6 @@
 import { prisma } from '../../db.js';
 import { TASK_STATUS } from '../../workflow.js';
+import { convertUrlToFile } from '../../ai/urlToFile.js';
 
 function notifyAdmins(ctx, text) {
   const admins = (process.env.ADMIN_TELEGRAM_IDS || '')
@@ -31,7 +32,17 @@ export function registerSubmit(bot) {
       return ctx.reply("You haven't claimed this task, so you can't submit a result.");
     }
 
-    const submissionType = /^https?:\/\//i.test(content) ? 'LINK' : 'TEXT';
+    const isUrl = /^https?:\/\//i.test(content);
+    const submissionType = isUrl ? 'LINK' : 'TEXT';
+
+    // Standardize URL submissions into a stored file (Jina Reader) so AI and
+    // reviewers analyze content, not a live URL (PROPOSAL_V2.md, Submit step).
+    let sourceUrl = null;
+    let submissionFileMetadata = null;
+    if (isUrl) {
+      sourceUrl = content;
+      submissionFileMetadata = await convertUrlToFile(content);
+    }
 
     await prisma.task.update({
       where: { id },
@@ -39,6 +50,8 @@ export function registerSubmit(bot) {
         status: TASK_STATUS.SUBMITTED,
         submissionType,
         submissionContent: content,
+        sourceUrl,
+        submissionFileMetadata,
         history: {
           create: {
             fromStatus: task.status,
@@ -49,7 +62,14 @@ export function registerSubmit(bot) {
       },
     });
 
-    await ctx.reply(`Submitted your result for task #${id}. Waiting for reviewer approval.`);
+    if (submissionFileMetadata?.conversionFailed) {
+      await ctx.reply(
+        `Submitted, but the link couldn't be auto-converted (${submissionFileMetadata.error}). ` +
+          'The reviewer will need to open it manually.'
+      );
+    } else {
+      await ctx.reply(`Submitted your result for task #${id}. Waiting for reviewer approval.`);
+    }
     await notifyAdmins(
       ctx,
       `Task #${id} "${task.title}" just got a new submission from ${ctx.from.username ? '@' + ctx.from.username : ctx.from.id}.\n` +

@@ -1,25 +1,30 @@
 export const TASK_STATUS = {
+  SIGNAL: 'SIGNAL',
   DRAFT: 'DRAFT',
   APPROVED: 'APPROVED',
-  OPEN: 'OPEN',
+  ROUTED: 'ROUTED',
   CLAIMED: 'CLAIMED',
   SUBMITTED: 'SUBMITTED',
   REVISION_REQUESTED: 'REVISION_REQUESTED',
   REJECTED: 'REJECTED',
   REVIEWED: 'REVIEWED',
+  AMPLIFIED: 'AMPLIFIED',
   COMPLETED: 'COMPLETED',
 };
 
-// Draft -> Approved -> Open -> Claimed -> Submitted -> Reviewed -> Completed,
-// with Rejected / Revision-Requested branches off Submitted.
+// Signal/request -> Reason&draft -> Human approval -> Route -> Claim -> Submit
+// -> Review -> Amplify -> Completed, with Rejected / Revision-Requested
+// branches off Submitted, and Amplify optional before Completed.
 const ALLOWED_TRANSITIONS = {
+  SIGNAL: ['DRAFT'],
   DRAFT: ['APPROVED'],
-  APPROVED: ['OPEN'],
-  OPEN: ['CLAIMED'],
+  APPROVED: ['ROUTED'],
+  ROUTED: ['CLAIMED'],
   CLAIMED: ['SUBMITTED'],
   SUBMITTED: ['REVIEWED', 'REJECTED', 'REVISION_REQUESTED'],
   REVISION_REQUESTED: ['SUBMITTED'],
-  REVIEWED: ['COMPLETED'],
+  REVIEWED: ['AMPLIFIED', 'COMPLETED'],
+  AMPLIFIED: ['COMPLETED'],
   REJECTED: [],
   COMPLETED: [],
 };

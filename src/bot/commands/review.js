@@ -29,44 +29,29 @@ export function registerReview(bot) {
     const toStatus = DECISION_TO_STATUS[decision];
     try {
       assertTransition(task.status, toStatus);
-      if (decision === 'approve') assertTransition(TASK_STATUS.REVIEWED, TASK_STATUS.COMPLETED);
     } catch (err) {
       return ctx.reply(`Cannot review: ${err.message}`);
     }
 
-    const finalStatus = decision === 'approve' ? TASK_STATUS.COMPLETED : toStatus;
-    const historyEntries =
-      decision === 'approve'
-        ? [
-            { toStatus: TASK_STATUS.REVIEWED, actorTelegramId: BigInt(ctx.from.id), note },
-            { toStatus: TASK_STATUS.COMPLETED, actorTelegramId: BigInt(ctx.from.id) },
-          ]
-        : [{ toStatus, actorTelegramId: BigInt(ctx.from.id), note }];
-
     await prisma.task.update({
       where: { id },
       data: {
-        status: finalStatus,
+        status: toStatus,
         reviewerNote: note,
-        history: { create: historyEntries },
+        history: { create: { toStatus, actorTelegramId: BigInt(ctx.from.id), note } },
       },
     });
 
-    if (task.assignedContributor) {
-      if (decision === 'approve') {
-        await prisma.contributor.update({
-          where: { id: task.assignedContributor.id },
-          data: { completedTaskCount: { increment: 1 } },
-        });
-      } else if (decision === 'reject') {
-        await prisma.contributor.update({
-          where: { id: task.assignedContributor.id },
-          data: { rejectedSubmissionCount: { increment: 1 } },
-        });
-      }
+    if (task.assignedContributor && decision === 'reject') {
+      await prisma.contributor.update({
+        where: { id: task.assignedContributor.id },
+        data: { rejectedSubmissionCount: { increment: 1 } },
+      });
+    }
 
+    if (task.assignedContributor) {
       const messages = {
-        approve: `Task #${id} "${task.title}" has been approved. Thank you!`,
+        approve: `Task #${id} "${task.title}" passed review. It will be finalized shortly (amplify/complete).`,
         reject: `Task #${id} "${task.title}" was rejected.${note ? ` Reason: ${note}` : ''}`,
         revise: `Task #${id} "${task.title}" needs revision.${note ? ` Note: ${note}` : ''} Use /submit ${id} <new content> to resubmit.`,
       };
@@ -76,6 +61,7 @@ export function registerReview(bot) {
         .catch(() => {});
     }
 
-    await ctx.reply(`Updated task #${id} -> ${finalStatus}.`);
+    const nextStep = decision === 'approve' ? ' Use /amplify or /complete next.' : '';
+    await ctx.reply(`Updated task #${id} -> ${toStatus}.${nextStep}`);
   });
 }
