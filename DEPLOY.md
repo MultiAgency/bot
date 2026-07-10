@@ -68,6 +68,7 @@ Stack: **Telegraf (long polling) + Prisma + Postgres on Neon + Railway**. No pub
    /review <application_id> approve
    ```
 3. To test signal detection and room admins: add the bot to a Telegram group. You (as a global admin) should get a DM confirming the invite was detected, and whoever added the bot becomes that room's first admin automatically. Open the group and run `/enablesignals`, then post a few sentences describing a real task-shaped request and watch for a "New signal..." DM once it clears the score threshold. Try `/addroomadmin` as a reply to another member's message to grant them room-scoped admin access without adding them to `ADMIN_TELEGRAM_IDS`.
+4. See [TESTING.md](TESTING.md) for a fuller manual test script covering every command, decline/withdraw/unassign, revision cycles, and cross-room permission isolation — worth running after any change to the workflow, not just on first deploy.
 
 ## Notes
 

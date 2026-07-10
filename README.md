@@ -17,7 +17,7 @@ Submission:  Submitted ──approve──▶ Approved       (each revision = a 
                        ──revise───▶ Needs revision  → contributor submits a new version
 ```
 
-A Task can have multiple contributors working on it in parallel (`max_assignees`); each contributor's candidacy is its own `Application`; each attempt they submit is its own versioned `Submission`. See [PROPOSAL_V2.md](PROPOSAL_V2.md) for the original architecture rationale (note: the workflow section there describes an earlier design — this README and `src/workflow.js` are the current source of truth) and [DEPLOY.md](DEPLOY.md) for deployment steps.
+A Task can have multiple contributors working on it in parallel (`max_assignees`); each contributor's candidacy is its own `Application`; each attempt they submit is its own versioned `Submission`. See [PROPOSAL_V2.md](PROPOSAL_V2.md) for the original architecture rationale (note: the workflow section there describes an earlier design — this README and `src/workflow.js` are the current source of truth), [DEPLOY.md](DEPLOY.md) for deployment steps, and [TESTING.md](TESTING.md) for a full manual test script.
 
 ## Stack
 
