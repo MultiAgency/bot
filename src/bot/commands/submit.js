@@ -1,7 +1,5 @@
-import { prisma } from '../../db.js';
-import { TASK_STATUS } from '../../workflow.js';
 import { convertUrlToFile } from '../../ai/urlToFile.js';
-import { notifyTaskManagers } from '../notifyAdmins.js';
+import { validateClaimForSubmission, finalizeSubmission } from './submitCore.js';
 
 export function registerSubmit(bot) {
   bot.command('submit', async (ctx) => {
@@ -10,19 +8,14 @@ export function registerSubmit(bot) {
     const content = parts.slice(2).join(' ').trim();
 
     if (!id || !content) {
-      return ctx.reply('Usage: /submit <task_id> <content or link>');
+      return ctx.reply(
+        'Usage: /submit <task_id> <content or link>\n' +
+          'Or send a video/photo/document with "/submit <task_id>" as the caption.'
+      );
     }
 
-    const task = await prisma.task.findUnique({ where: { id }, include: { assignedContributor: true } });
-    if (!task) return ctx.reply(`Task #${id} not found.`);
-
-    if (task.status !== TASK_STATUS.CLAIMED && task.status !== TASK_STATUS.REVISION_REQUESTED) {
-      return ctx.reply(`Task #${id} is not awaiting a submission right now (status: ${task.status}).`);
-    }
-
-    if (task.assignedContributor?.telegramUserId !== BigInt(ctx.from.id)) {
-      return ctx.reply("You haven't claimed this task, so you can't submit a result.");
-    }
+    const { task, error } = await validateClaimForSubmission(ctx, id);
+    if (error) return ctx.reply(error);
 
     const isUrl = /^https?:\/\//i.test(content);
     const submissionType = isUrl ? 'LINK' : 'TEXT';
@@ -36,22 +29,11 @@ export function registerSubmit(bot) {
       submissionFileMetadata = await convertUrlToFile(content);
     }
 
-    await prisma.task.update({
-      where: { id },
-      data: {
-        status: TASK_STATUS.SUBMITTED,
-        submissionType,
-        submissionContent: content,
-        sourceUrl,
-        submissionFileMetadata,
-        history: {
-          create: {
-            fromStatus: task.status,
-            toStatus: TASK_STATUS.SUBMITTED,
-            actorTelegramId: BigInt(ctx.from.id),
-          },
-        },
-      },
+    await finalizeSubmission(ctx, task, {
+      submissionType,
+      submissionContent: content,
+      sourceUrl,
+      submissionFileMetadata,
     });
 
     if (submissionFileMetadata?.conversionFailed) {
@@ -62,11 +44,5 @@ export function registerSubmit(bot) {
     } else {
       await ctx.reply(`Submitted your result for task #${id}. Waiting for reviewer approval.`);
     }
-    await notifyTaskManagers(
-      ctx,
-      task,
-      `Task #${id} "${task.title}" just got a new submission from ${ctx.from.username ? '@' + ctx.from.username : ctx.from.id}.\n` +
-        `Use /review ${id} approve|reject|revise [note] to handle it.`
-    );
   });
 }

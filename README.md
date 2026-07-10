@@ -19,7 +19,7 @@ npm run dev
 
 ## Bot commands
 
-Contributor: `/start`, `/register <twitter_handle>`, `/tasks`, `/claim <id>`, `/submit <id> <content|link>`, `/status <id>`
+Contributor: `/start`, `/register <twitter_handle>`, `/tasks`, `/claim <id>`, `/submit <id> <content|link>`, `/status <id>`. To submit a video, photo, or file, send it directly to the bot with `/submit <id>` as the caption.
 
 Admin (global admins in `ADMIN_TELEGRAM_IDS`, or room admins for tasks belonging to their room — see [Multi-admin / room permissions](#multi-admin--room-permissions)):
 - `/newtask <title> | <description> | <reward> | <required output> | [category] | [skill1,skill2]`
@@ -63,6 +63,12 @@ Only registered contributors can `/claim` tasks.
 
 `src/matching.js` computes a composite match score per PROPOSAL_V2.md's weighting (skill fit, reputation, past performance, social trust, availability, preference) and ranks registered candidates for a task. `/route` uses it to suggest a contributor, but routing is a **suggestion, not a lock** in this version — any registered contributor can still `/claim` a routed task. Hard-locking + reroute-on-timeout would need a background scheduler and is deferred to a later stage.
 
+## Submissions
+
+Text and links go through `/submit <id> <content>` (links auto-convert via Jina Reader, see above). Video, photo, and document submissions go through Telegram's native upload instead: send the file to the bot with `/submit <id> [optional note]` as its **caption** — no extra command needed, `src/bot/commands/submitMedia.js` listens for `video`/`photo`/`document` messages and checks the caption for a task ID. The Telegram `file_id` is stored directly as `submissionFileId` (already a stable, standardized reference — no conversion step needed, unlike URLs). Photos are tagged `SCREENSHOT`, video/documents are tagged `FILE`. The original message is also forwarded (via `copyMessage`) to that task's admins/room admins alongside the text notification, so reviewers see the actual file immediately instead of having to ask for it.
+
+Caption-based submission means there's currently no two-step "‌/submit 5" then "here's the file" flow — the caption has to be on the file itself. That's a deliberate simplification to avoid adding session/state tracking; worth revisiting if it turns out to be an awkward flow on mobile.
+
 ## Multi-admin / room permissions
 
 Two problems come up once a group has more than one admin: two admins acting on the same task at once, and admins from unrelated rooms being able to touch each other's tasks.
@@ -73,7 +79,7 @@ Two problems come up once a group has more than one admin: two admins acting on 
 
 ## Not done yet
 
-- File/screenshot submissions (currently `/submit` only accepts text/link; links are auto-converted via Jina Reader)
+- Two-step submission flow (`/submit <id>` now, file later) — the caption has to be on the file itself for now
 - Multi-step wizard for `/newtask` (currently a single-line, `|`-delimited syntax)
 - Wiring `suggestTaskDescription` / `summarizeSubmission` (`src/ai/claude.js`) into the task-creation / review flow
 - Real Twitter/X API scoring (needs a paid API tier decision — see `computeTwitterScore` in `src/candidateEvaluation.js`)

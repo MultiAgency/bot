@@ -23,7 +23,8 @@ export function registerStart(bot) {
       '/register <twitter_handle> - register and get evaluated before you can claim tasks',
       '/tasks - view routed/open tasks',
       '/claim <id> - claim a task',
-      '/submit <id> <content or link> - submit your result',
+      '/submit <id> <content or link> - submit text or a link',
+      'To submit a video, photo, or file: send it to me with "/submit <id>" as the caption',
       '/status <id> - view task status',
     ];
 

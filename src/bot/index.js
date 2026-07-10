@@ -7,6 +7,7 @@ import { registerRoute } from './commands/route.js';
 import { registerTasks } from './commands/tasks.js';
 import { registerClaim } from './commands/claim.js';
 import { registerSubmit } from './commands/submit.js';
+import { registerSubmitMedia } from './commands/submitMedia.js';
 import { registerReview } from './commands/review.js';
 import { registerAmplify } from './commands/amplify.js';
 import { registerComplete } from './commands/complete.js';
@@ -26,6 +27,7 @@ export function createBot(token) {
   registerTasks(bot);
   registerClaim(bot);
   registerSubmit(bot);
+  registerSubmitMedia(bot);
   registerReview(bot);
   registerAmplify(bot);
   registerComplete(bot);
