@@ -37,6 +37,9 @@ export function registerStart(bot) {
         '/review <id> approve|reject|revise [note] - handle a submission',
         '/amplify <id> [note] - mark a reviewed task as amplified',
         '/complete <id> - close out a task (updates contributor stats)',
+        '/enablesignals - turn on auto-drafting from this group\'s messages',
+        '/disablesignals - turn it off for this group',
+        '/signalstatus - check whether this chat is being watched',
       );
     }
 

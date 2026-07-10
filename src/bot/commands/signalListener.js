@@ -1,33 +1,20 @@
 import { processSignalMessage } from '../../signalDetection.js';
+import { isMonitored } from '../../monitoredChats.js';
+import { notifyAdmins } from '../notifyAdmins.js';
 
-function notifyAdmins(ctx, text) {
-  const admins = (process.env.ADMIN_TELEGRAM_IDS || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  return Promise.allSettled(admins.map((adminId) => ctx.telegram.sendMessage(adminId, text)));
-}
-
-function monitoredChatIds() {
-  return (process.env.SIGNAL_CHAT_IDS || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-// Passively watches configured group chats and auto-drafts tasks from
-// promising messages (see src/signalDetection.js). Disabled unless
-// SIGNAL_CHAT_IDS is set - opt-in per chat, not on by default, since it
-// requires disabling Telegram's bot privacy mode (see DEPLOY.md).
+// Passively watches group chats that an admin has opted in via
+// /enablesignals, and auto-drafts tasks from promising messages (see
+// src/signalDetection.js). Opt-in is per chat and stored in the DB
+// (src/monitoredChats.js) - see src/bot/commands/signalChatAdmin.js for how
+// chats get enabled. Also requires disabling Telegram's bot privacy mode
+// (see DEPLOY.md), or the bot never receives non-command messages at all.
 export function registerSignalListener(bot) {
   bot.on('text', async (ctx) => {
     if (ctx.message.text.startsWith('/')) return; // commands are handled elsewhere
     if (ctx.from?.is_bot) return;
 
-    const watched = monitoredChatIds();
-    if (watched.length === 0) return;
-    if (!watched.includes(String(ctx.chat.id))) return;
+    const watched = await isMonitored(ctx.chat.id).catch(() => false);
+    if (!watched) return;
 
     const task = await processSignalMessage({
       text: ctx.message.text,

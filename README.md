@@ -41,10 +41,10 @@ SIGNAL → DRAFT → APPROVED → ROUTED → CLAIMED → SUBMITTED → REVIEWED 
 
 The bot can passively watch group chats and auto-draft a task when a message looks like a real opportunity (`src/signalDetection.js` + `evaluateSignal` in `src/ai/claude.js`). It never auto-approves — auto-drafted tasks land in `DRAFT` exactly like `/newtask`, and an admin still has to `/approve` them.
 
-**Disabled by default.** To enable it for a chat:
-1. Message [@BotFather](https://t.me/BotFather) → `/setprivacy` → select your bot → **Disable**. By default Telegram only delivers commands/mentions to bots in groups; disabling privacy mode lets it see all messages (existing group members must be aware of this).
-2. Add the bot to the group, get the chat's numeric ID (e.g. forward a message from the group to [@userinfobot](https://t.me/userinfobot), or check bot logs — group chat IDs are negative numbers).
-3. Set `SIGNAL_CHAT_IDS` to that ID (comma-separated for multiple chats).
+**Disabled by default, opt-in per chat, no redeploy needed.** To enable it for a chat:
+1. Message [@BotFather](https://t.me/BotFather) → `/setprivacy` → select your bot → **Disable**, once, for the bot account. By default Telegram only delivers commands/mentions to bots in groups; disabling privacy mode lets it see all messages (existing group members must be aware of this).
+2. Add the bot to the group. It auto-detects the invite (`my_chat_member` update, handled in `src/bot/commands/signalChatAdmin.js`) and DMs every admin in `ADMIN_TELEGRAM_IDS` with the chat's name/ID and what to do next.
+3. An admin opens that group and runs `/enablesignals` there. This upserts a row in the `MonitoredChat` table (`src/monitoredChats.js`) — no env var, no redeploy. `/disablesignals` turns it back off (also happens automatically if the bot is removed from the group); `/signalstatus` checks the current chat's state.
 
 Pipeline per message: a cheap length/word-count pre-filter runs first (no API cost), then a per-chat rate limit (`SIGNAL_MAX_PER_HOUR`, default 20/hour, in-memory — resets on restart), then Claude (Haiku) scores it 0–10 and drafts a title/description/category/skills if it clears `SIGNAL_SCORE_THRESHOLD` (default 6). Every evaluated message is stored as a `Signal` row regardless of outcome (`status: DRAFTED` or `DISCARDED`), so discarded signals stay auditable.
 
@@ -70,3 +70,4 @@ Only registered contributors can `/claim` tasks.
 - Hard routing locks / reroute-on-timeout (needs a scheduler)
 - Signal rate-limit counters are in-memory only (reset on restart/redeploy, not shared across instances)
 - Non-Telegram signal sources (Twitter, Discord, GitHub, news) — only in-chat messages are watched today
+- `/enablesignals` trusts anyone in `ADMIN_TELEGRAM_IDS`, even if they aren't a member/admin of that specific group

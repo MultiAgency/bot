@@ -1,15 +1,7 @@
 import { prisma } from '../../db.js';
 import { TASK_STATUS } from '../../workflow.js';
 import { convertUrlToFile } from '../../ai/urlToFile.js';
-
-function notifyAdmins(ctx, text) {
-  const admins = (process.env.ADMIN_TELEGRAM_IDS || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  return Promise.allSettled(admins.map((adminId) => ctx.telegram.sendMessage(adminId, text)));
-}
+import { notifyAdmins } from '../notifyAdmins.js';
 
 export function registerSubmit(bot) {
   bot.command('submit', async (ctx) => {
