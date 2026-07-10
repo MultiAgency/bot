@@ -6,6 +6,8 @@ import { registerDraftTask } from './commands/draftTask.js';
 import { registerApprove } from './commands/approve.js';
 import { registerRoute } from './commands/route.js';
 import { registerTasks } from './commands/tasks.js';
+import { registerMyTasks } from './commands/myTasks.js';
+import { registerAllTasks } from './commands/allTasks.js';
 import { registerClaim } from './commands/claim.js';
 import { registerSubmit } from './commands/submit.js';
 import { registerSubmitMedia } from './commands/submitMedia.js';
@@ -29,6 +31,8 @@ export function createBot(token) {
   registerApprove(bot);
   registerRoute(bot);
   registerTasks(bot);
+  registerMyTasks(bot);
+  registerAllTasks(bot);
   registerClaim(bot);
   registerSubmit(bot);
   registerSubmitMedia(bot);

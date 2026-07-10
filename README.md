@@ -19,12 +19,13 @@ npm run dev
 
 ## Bot commands
 
-Contributor: `/start`, `/register <twitter_handle>`, `/tasks`, `/claim <id>`, `/submit <id> [content or link]`, `/status <id>`, `/cancel`. To submit a video, photo, or file, either send it with `/submit <id>` as the caption, or send `/submit <id>` alone and then the file/text within 5 minutes (see [Submissions](#submissions)).
+Contributor: `/start` or `/help` (shows the command guide), `/register <twitter_handle>`, `/tasks` (open/routed tasks), `/mytasks` (your tasks and their status), `/claim <id>`, `/submit <id> [content or link]`, `/status <id>` (one task's status/history), `/cancel`. To submit a video, photo, or file, either send it with `/submit <id>` as the caption, or send `/submit <id>` alone and then the file/text within 5 minutes (see [Submissions](#submissions)).
 
 Admin (global admins in `ADMIN_TELEGRAM_IDS`, or room admins for tasks belonging to their room — see [Multi-admin / room permissions](#multi-admin--room-permissions)):
 - `/newtask <title> | <description> | <reward> | <required output> | [category] | [skill1,skill2]`, or just `/newtask` for a step-by-step wizard
 - `/drafttask <short prompt>` — Claude expands a short request into a full draft
 - `/drafts` — list tasks awaiting approval (all of them for global admins, your rooms' for room admins)
+- `/alltasks [status]` — list every task regardless of status (optionally filtered, e.g. `/alltasks CLAIMED`), same room-scoping as `/drafts`
 - `/approve <id>` — Draft → Approved
 - `/route <id>` — Approved → Routed, ranks registered contributors via the matching engine and reserves the task for the top match (see [Routing](#routing-lock--reroute-scheduler))
 - `/review <id> approve|reject|revise [note]` — Submitted → Reviewed/Rejected/Revision-Requested
