@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TaskStatus {
+  DRAFT
+  APPROVED
+  OPEN
+  CLAIMED
+  SUBMITTED
+  REVISION_REQUESTED
+  REJECTED
+  REVIEWED
+  COMPLETED
+}
+
+enum SubmissionType {
+  TEXT
+  LINK
+  FILE
+  SCREENSHOT
+}
+
+model Contributor {
+  id                      Int      @id @default(autoincrement())
+  telegramUserId          BigInt   @unique
+  telegramUsername        String?
+  displayName             String?
+  claimedTaskCount        Int      @default(0)
+  completedTaskCount      Int      @default(0)
+  rejectedSubmissionCount Int      @default(0)
+  trustStatus             String   @default("unverified")
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  tasks Task[]
+
+  @@map("contributors")
+}
+
+model Task {
+  id                     Int             @id @default(autoincrement())
+  title                   String
+  description             String
+  reward                  String?
+  deadline                DateTime?
+  requiredOutput          String?
+  status                  TaskStatus      @default(DRAFT)
+  createdByTelegramId     BigInt
+
+  assignedContributorId   Int?
+  assignedContributor     Contributor?    @relation(fields: [assignedContributorId], references: [id])
+
+  submissionType          SubmissionType?
+  submissionContent       String?
+  submissionFileId        String?
+  reviewerNote            String?
+
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+
+  history TaskHistory[]
+
+  @@map("tasks")
+}
+
+model TaskHistory {
+  id              Int        @id @default(autoincrement())
+  taskId          Int
+  task            Task       @relation(fields: [taskId], references: [id])
+  fromStatus      TaskStatus?
+  toStatus        TaskStatus
+  actorTelegramId BigInt
+  note            String?
+  createdAt       DateTime   @default(now())
+
+  @@map("task_history")
+}
