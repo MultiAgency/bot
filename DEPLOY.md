@@ -60,7 +60,7 @@ Stack: **Telegraf (long polling) + Prisma + Postgres on Neon + Railway**. No pub
    ```
    /newtask Test task | Say hello | 5 USDT | a reply | content | writing
    /approve <id>
-   /register <your_twitter_handle>   (from a second account, or reuse yours)
+   /onboard <your_twitter_handle>   (from a second account, or reuse yours)
    /apply <id>
    /applicants <id>                  (note the application_id it prints)
    /assign <application_id>

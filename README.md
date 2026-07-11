@@ -34,7 +34,7 @@ npm run dev
 
 ## Bot commands
 
-Contributor: `/start` or `/help` (command guide), `/register <twitter_handle>`, `/tasks` (open tasks), `/apply <id>`, `/withdraw <id>` (only while unassigned), `/mytasks` (your applications and their status), `/submit <id> [content or link]` (only while assigned), `/status <id>` (a task's applications/history), `/cancel`. To submit a video, photo, or file, either send it with `/submit <id>` as the caption, or send `/submit <id>` alone and then the file/text within 5 minutes (see [Submissions](#submissions)).
+Contributor: `/start` or `/help` (command guide), `/onboard <twitter_handle>`, `/tasks` (open tasks), `/apply <id>`, `/withdraw <id>` (only while unassigned), `/mytasks` (your applications and their status), `/submit <id> [content or link]` (only while assigned), `/status <id>` (a task's applications/history), `/cancel`. To submit a video, photo, or file, either send it with `/submit <id>` as the caption, or send `/submit <id>` alone and then the file/text within 5 minutes (see [Submissions](#submissions)).
 
 Admin (global admins in `ADMIN_TELEGRAM_IDS`, or room admins for tasks belonging to their room — see [Multi-admin / room permissions](#multi-admin--room-permissions)):
 - `/newtask <title> | <description> | <reward> | <required output> | [category] | [skill1,skill2] | [max_assignees]`, or just `/newtask` for a step-by-step wizard
@@ -76,7 +76,7 @@ Pipeline per message: a cheap length/word-count pre-filter runs first (no API co
 
 ## Candidate evaluation
 
-`/register <twitter_handle>` marks a contributor `isRegistered` and computes:
+`/onboard <twitter_handle>` marks a contributor `isRegistered` and computes:
 - `telegramScore` — real signal from profile completeness + in-system track record (`src/candidateEvaluation.js`)
 - `twitterScore` — see below
 - `socialTrustScore` / `eligibilityTier` — derived from the above

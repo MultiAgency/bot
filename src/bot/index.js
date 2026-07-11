@@ -1,6 +1,6 @@
 import { Telegraf } from 'telegraf';
 import { registerStart } from './commands/start.js';
-import { registerRegister } from './commands/register.js';
+import { registerOnboard } from './commands/onboard.js';
 import { registerNewTask } from './commands/newTask.js';
 import { registerDraftTask } from './commands/draftTask.js';
 import { registerApprove } from './commands/approve.js';
@@ -29,7 +29,7 @@ export function createBot(token) {
   const bot = new Telegraf(token);
 
   registerStart(bot);
-  registerRegister(bot);
+  registerOnboard(bot);
   registerNewTask(bot);
   registerDraftTask(bot);
   registerApprove(bot);

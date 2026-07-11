@@ -1,11 +1,11 @@
 import { prisma } from '../../db.js';
 import { evaluateCandidate } from '../../candidateEvaluation.js';
 
-export function registerRegister(bot) {
-  bot.command('register', async (ctx) => {
+export function registerOnboard(bot) {
+  bot.command('onboard', async (ctx) => {
     const twitterHandle = ctx.message.text.split(' ')[1]?.replace(/^@/, '');
     if (!twitterHandle) {
-      return ctx.reply('Usage: /register <twitter_handle> (without @)');
+      return ctx.reply('Usage: /onboard <twitter_handle> (without @)');
     }
 
     const contributor = await prisma.contributor.upsert({
@@ -40,7 +40,7 @@ export function registerRegister(bot) {
 
     await ctx.reply(
       [
-        `Registered @${twitterHandle}. Initial trust tier: ${eligibilityTier}.`,
+        `Onboarded @${twitterHandle}. Initial trust tier: ${eligibilityTier}.`,
         `Telegram score: ${telegramScore.toFixed(2)}`,
         twitterScore == null
           ? 'Twitter score: unavailable (not configured on this deployment, or the profile couldn\'t be found)'

@@ -12,7 +12,7 @@ export function registerApply(bot) {
       where: { telegramUserId: BigInt(ctx.from.id) },
     });
     if (!contributor?.isRegistered) {
-      return ctx.reply('You need to /register <twitter_handle> before applying to tasks.');
+      return ctx.reply('You need to /onboard <twitter_handle> before applying to tasks.');
     }
 
     const task = await prisma.task.findUnique({ where: { id } });

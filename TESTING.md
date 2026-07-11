@@ -43,19 +43,19 @@ All three tasks should appear, still in `DRAFT`.
 ```
 /approve <id>
 ```
-Expect: task flips to `OPEN`; reply confirms `(max N assignees)`. If any contributor is already `/register`ed, they should get a DM suggesting the task (best done with the contributor account already registered from a previous run — see step 4 first, then come back and approve a second task to see the nudge fire).
+Expect: task flips to `OPEN`; reply confirms `(max N assignees)`. If any contributor is already `/onboard`ed, they should get a DM suggesting the task (best done with the contributor account already registered from a previous run — see step 4 first, then come back and approve a second task to see the nudge fire).
 
 ```
 /tasks
 ```
 Should list the task as `0/N assigned`.
 
-## 4. Register + apply
+## 4. Onboard + apply
 
 As the **contributor** account:
 
 ```
-/register mytwitterhandle
+/onboard mytwitterhandle
 ```
 Expect a reply with `telegramScore`, `twitterScore` (or "unavailable" if `TWITTER_COOKIES` isn't configured — that's expected, not a bug), `socialTrustScore`, and a tier.
 
@@ -151,7 +151,7 @@ For a fast smoke test after a deploy, this is the shortest path that touches eve
 ```
 /newtask Test task | Say hello | 5 USDT | a reply | content | writing | 1
 /approve <id>
-/register testhandle          (contributor account)
+/onboard testhandle          (contributor account)
 /apply <id>                   (contributor account)
 /applicants <id>
 /assign <application_id>
