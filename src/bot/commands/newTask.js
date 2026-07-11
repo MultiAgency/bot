@@ -1,9 +1,11 @@
 import {
   resolveCreationContext,
   createDraftTask,
-  taskCreatedReply,
+  taskCreatedMessage,
   forceReplyExtra,
   handleNewTaskCategoryChoice,
+  handleNewTaskSkillToggle,
+  handleNewTaskSkillsDone,
 } from './newTaskCore.js';
 import { setPending, peekPending } from '../pendingActions.js';
 
@@ -48,7 +50,8 @@ export function registerNewTask(bot) {
       maxAssignees,
     });
 
-    await ctx.reply(taskCreatedReply(task));
+    const { text, keyboard } = taskCreatedMessage(task);
+    await ctx.reply(text, keyboard);
   });
 
   bot.action(/^newtask_category:(.+)$/, async (ctx) => {
@@ -58,5 +61,23 @@ export function registerNewTask(bot) {
     }
 
     return handleNewTaskCategoryChoice(ctx, entry, ctx.match[1]);
+  });
+
+  bot.action(/^newtask_skill:(\d+)$/, async (ctx) => {
+    const entry = peekPending(ctx.from.id);
+    if (!entry || entry.type !== 'newtask_wizard' || entry.data.step !== 'skills') {
+      return ctx.answerCbQuery('⚠️ This selection has expired - run /newtask again.');
+    }
+
+    return handleNewTaskSkillToggle(ctx, entry, Number(ctx.match[1]));
+  });
+
+  bot.action('newtask_skills_done', async (ctx) => {
+    const entry = peekPending(ctx.from.id);
+    if (!entry || entry.type !== 'newtask_wizard' || entry.data.step !== 'skills') {
+      return ctx.answerCbQuery('⚠️ This selection has expired - run /newtask again.');
+    }
+
+    return handleNewTaskSkillsDone(ctx, entry);
   });
 }

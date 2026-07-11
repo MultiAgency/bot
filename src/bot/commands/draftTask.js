@@ -1,5 +1,5 @@
 import { draftTask } from '../../ai/claude.js';
-import { resolveCreationContext, createDraftTask } from './newTaskCore.js';
+import { resolveCreationContext, createDraftTask, taskCreatedMessage } from './newTaskCore.js';
 
 export function registerDraftTask(bot) {
   bot.command('drafttask', async (ctx) => {
@@ -34,10 +34,7 @@ export function registerDraftTask(bot) {
       requiredSkills: drafted.skillTags || [],
     });
 
-    await ctx.reply(
-      `🤖 AI-drafted task #${task.id}: "${task.title}"\n\n${task.description}\n\n` +
-        `📦 Required output: ${task.requiredOutput || '(not specified)'}\n\n` +
-        `👀 Review it - edit with /newtask if needed, or use /approve ${task.id} to accept as-is.`
-    );
+    const { text, keyboard } = taskCreatedMessage(task);
+    await ctx.reply(`🤖 AI-drafted:\n\n${text}\n\n👀 Edit with /newtask if it needs changes.`, keyboard);
   });
 }

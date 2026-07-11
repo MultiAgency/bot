@@ -3,6 +3,7 @@ import { prisma } from '../../db.js';
 import { setPending, peekPending, updatePending, clearPending } from '../pendingActions.js';
 import { evaluateCandidate } from '../../candidateEvaluation.js';
 import { TIER_EMOJI } from '../emoji.js';
+import { SKILLS_BY_ROLE } from '../skillCatalog.js';
 
 // Entirely button-driven (no free-text steps): in a group, a plain text
 // reply from the user only reaches the bot if Privacy Mode is disabled AND
@@ -32,17 +33,6 @@ const INCOME_OPTIONS = [
 ];
 
 const INCOME_LABELS = Object.fromEntries(INCOME_OPTIONS.map(([label, value]) => [value, label]));
-
-const SKILLS_BY_ROLE = {
-  DEVELOPER: ['Solidity', 'Rust', 'JS/TS', 'Python', 'Smart Contracts', 'Backend', 'Frontend', 'Mobile'],
-  DESIGNER: ['UI Design', 'UX Design', 'Graphic Design', 'Branding', 'Illustration', 'Motion Graphics'],
-  WRITER: ['Copywriting', 'Technical Writing', 'Content Strategy', 'Translation', 'Editing'],
-  MARKETING: ['Social Media', 'Growth', 'SEO', 'Paid Ads', 'Community Growth', 'Influencer Outreach'],
-  COMMUNITY: ['Moderation', 'Discord Mgmt', 'Event Hosting', 'Community Building'],
-  RESEARCH: ['Market Research', 'Data Analysis', 'Competitor Analysis', 'Tokenomics'],
-  VIDEO: ['Video Editing', 'Animation', 'Videography', 'Streaming'],
-  OTHER: ['General', 'Admin', 'Ops'],
-};
 
 function skillsKeyboard(role, selected) {
   const skills = SKILLS_BY_ROLE[role] || SKILLS_BY_ROLE.OTHER;
