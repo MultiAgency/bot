@@ -11,6 +11,11 @@ import { SKILLS_BY_ROLE } from '../skillCatalog.js';
 // Callback queries (button presses), on the other hand, always reach the
 // bot regardless of Privacy Mode - so keeping onboarding 100% button-based
 // makes it work reliably in groups without depending on that setup step.
+//
+// The whole wizard also stays inside a single message, edited in place at
+// each step (role -> income -> skills -> done), instead of replying with a
+// new bubble per step - keeps the chat from filling up with one-line
+// "✅ Role: ..." / "✅ Income: ..." messages.
 
 const JOB_ROLES = [
   ['👨‍💻 Developer', 'DEVELOPER'],
@@ -46,6 +51,15 @@ function skillsKeyboard(role, selected) {
   );
 }
 
+// Builds the running summary shown in the single onboarding message -
+// each answered step becomes a line, followed by the current question.
+function summaryLines(fields) {
+  const lines = ['🚀 Onboarding', ''];
+  if (fields.jobRole) lines.push(`✅ Role: ${fields.jobRole}`);
+  if (fields.desiredIncomeLabel) lines.push(`✅ Income: ${fields.desiredIncomeLabel}`);
+  return lines;
+}
+
 async function finalizeOnboarding(ctx, fields) {
   const contributor = await prisma.contributor.upsert({
     where: { telegramUserId: BigInt(ctx.from.id) },
@@ -75,26 +89,24 @@ async function finalizeOnboarding(ctx, fields) {
 
   const tierEmoji = TIER_EMOJI[eligibilityTier] || '🏷';
 
-  await ctx.reply(
-    [
-      `🎉 You're onboarded as ${fields.jobRole}!`,
-      `${tierEmoji} Trust tier: ${eligibilityTier}`,
-      fields.desiredIncomeLabel ? `💰 Desired income: ${fields.desiredIncomeLabel}` : null,
-      `⭐ Skills: ${fields.selectedSkills?.length ? fields.selectedSkills.join(', ') : '(none selected)'}`,
-      `📊 Telegram score: ${telegramScore.toFixed(2)}`,
-      '',
-      "✅ You're all set — use /tasks to see what's open.",
-    ]
-      .filter(Boolean)
-      .join('\n')
-  );
+  return [
+    `🎉 You're onboarded as ${fields.jobRole}!`,
+    `${tierEmoji} Trust tier: ${eligibilityTier}`,
+    fields.desiredIncomeLabel ? `💰 Desired income: ${fields.desiredIncomeLabel}` : null,
+    `⭐ Skills: ${fields.selectedSkills?.length ? fields.selectedSkills.join(', ') : '(none selected)'}`,
+    `📊 Telegram score: ${telegramScore.toFixed(2)}`,
+    '',
+    "✅ You're all set — use /tasks to see what's open.",
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 export function registerOnboard(bot) {
   bot.command('onboard', async (ctx) => {
     setPending(ctx.from.id, 'onboard_wizard', { step: 'jobRole', fields: {} });
     await ctx.reply(
-      "🚀 Let's get you onboarded! What's your primary role?",
+      [...summaryLines({}), "What's your primary role?"].join('\n'),
       Markup.inlineKeyboard(
         JOB_ROLES.map(([label, value]) => Markup.button.callback(label, `onboard_role:${value}`)),
         { columns: 2 }
@@ -109,17 +121,17 @@ export function registerOnboard(bot) {
     }
 
     const role = ctx.match[1];
-    updatePending(ctx.from.id, { step: 'income', fields: { ...entry.data.fields, jobRole: role } });
+    const fields = { ...entry.data.fields, jobRole: role };
+    updatePending(ctx.from.id, { step: 'income', fields });
 
     await ctx.answerCbQuery();
-    await ctx.editMessageText(`✅ Role: ${role}`).catch(() => {});
-    await ctx.reply(
-      '💰 What income/rate are you looking for?',
+    await ctx.editMessageText(
+      [...summaryLines(fields), '', '💰 What income/rate are you looking for?'].join('\n'),
       Markup.inlineKeyboard(
         INCOME_OPTIONS.map(([label, value]) => Markup.button.callback(label, `onboard_income:${value}`)),
         { columns: 2 }
       )
-    );
+    ).catch(() => {});
   });
 
   bot.action(/^onboard_income:(.+)$/, async (ctx) => {
@@ -130,15 +142,14 @@ export function registerOnboard(bot) {
 
     const value = ctx.match[1];
     const desiredIncomeLabel = INCOME_LABELS[value] || value;
-    const fields = { ...entry.data.fields, desiredIncomeLabel };
-    updatePending(ctx.from.id, { step: 'skills', fields: { ...fields, selectedSkills: [] } });
+    const fields = { ...entry.data.fields, desiredIncomeLabel, selectedSkills: [] };
+    updatePending(ctx.from.id, { step: 'skills', fields });
 
     await ctx.answerCbQuery();
-    await ctx.editMessageText(`✅ Income: ${desiredIncomeLabel}`).catch(() => {});
-    await ctx.reply(
-      `⭐ Pick your skills (${fields.jobRole}) — tap each one, then Done:`,
+    await ctx.editMessageText(
+      [...summaryLines(fields), '', `⭐ Pick your skills (${fields.jobRole}) — tap each one, then Done:`].join('\n'),
       skillsKeyboard(fields.jobRole, [])
-    );
+    ).catch(() => {});
   });
 
   bot.action(/^onboard_skill:(\d+)$/, async (ctx) => {
@@ -169,10 +180,8 @@ export function registerOnboard(bot) {
 
     clearPending(ctx.from.id);
     await ctx.answerCbQuery();
-    await ctx.editMessageText(
-      `⭐ Skills: ${entry.data.fields.selectedSkills?.length ? entry.data.fields.selectedSkills.join(', ') : '(none selected)'}`
-    ).catch(() => {});
 
-    await finalizeOnboarding(ctx, entry.data.fields);
+    const finalText = await finalizeOnboarding(ctx, entry.data.fields);
+    await ctx.editMessageText(finalText, Markup.inlineKeyboard([])).catch(() => ctx.reply(finalText));
   });
 }

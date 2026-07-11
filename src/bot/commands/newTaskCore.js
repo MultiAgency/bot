@@ -174,24 +174,23 @@ export async function handleNewTaskWizardStep(ctx, entry) {
 }
 
 // Handles the newtask_category:<value> button press (see newTask.js), then
-// moves into the skills multi-select.
+// moves into the skills multi-select - edits the same message rather than
+// sending a new one, so category+skills stay in one bubble.
 export async function handleNewTaskCategoryChoice(ctx, entry, value) {
   const { fields, lastUserMessageId } = entry.data;
   const category = value === 'skip' ? null : value;
   const updatedFields = { ...fields, category };
 
   await ctx.answerCbQuery();
-  await ctx.editMessageText(`🏷️ Category: ${category || '(none)'}`).catch(() => {});
-
   updatePending(ctx.from.id, {
     step: 'skills',
     fields: { ...updatedFields, selectedSkills: [] },
     lastUserMessageId,
   });
-  return ctx.reply(
-    `🛠️ Pick skills for this task${category ? ` (${category})` : ''}, then Done:`,
+  await ctx.editMessageText(
+    [`🏷️ Category: ${category || '(none)'}`, '', `🛠️ Pick skills for this task${category ? ` (${category})` : ''}, then Done:`].join('\n'),
     skillsKeyboard(category, [])
-  );
+  ).catch(() => {});
 }
 
 // Toggles one skill in the newtask_skill:<index> multi-select (see
@@ -220,7 +219,10 @@ export async function handleNewTaskSkillsDone(ctx, entry) {
 
   await ctx.answerCbQuery();
   await ctx.editMessageText(
-    `🛠️ Skills: ${requiredSkills.length ? requiredSkills.join(', ') : '(none selected)'}`
+    [
+      `🏷️ Category: ${updatedFields.category || '(none)'}`,
+      `🛠️ Skills: ${requiredSkills.length ? requiredSkills.join(', ') : '(none selected)'}`,
+    ].join('\n')
   ).catch(() => {});
 
   const following = nextWizardStep('skills');
