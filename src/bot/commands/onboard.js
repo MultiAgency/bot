@@ -106,7 +106,7 @@ export function registerOnboard(bot) {
   bot.command('onboard', async (ctx) => {
     setPending(ctx.from.id, 'onboard_wizard', { step: 'jobRole', fields: {} });
     await ctx.reply(
-      [...summaryLines({}), "What's your primary role?"].join('\n'),
+      [...summaryLines({}), 'Role?'].join('\n'),
       Markup.inlineKeyboard(
         JOB_ROLES.map(([label, value]) => Markup.button.callback(label, `onboard_role:${value}`)),
         { columns: 2 }
@@ -126,7 +126,7 @@ export function registerOnboard(bot) {
 
     await ctx.answerCbQuery();
     await ctx.editMessageText(
-      [...summaryLines(fields), '', '💰 What income/rate are you looking for?'].join('\n'),
+      [...summaryLines(fields), '', '💰 Income/rate?'].join('\n'),
       Markup.inlineKeyboard(
         INCOME_OPTIONS.map(([label, value]) => Markup.button.callback(label, `onboard_income:${value}`)),
         { columns: 2 }
@@ -147,7 +147,7 @@ export function registerOnboard(bot) {
 
     await ctx.answerCbQuery();
     await ctx.editMessageText(
-      [...summaryLines(fields), '', `⭐ Pick your skills (${fields.jobRole}) — tap each one, then Done:`].join('\n'),
+      [...summaryLines(fields), '', `⭐ Skills (${fields.jobRole}) — tap, then Done`].join('\n'),
       skillsKeyboard(fields.jobRole, [])
     ).catch(() => {});
   });

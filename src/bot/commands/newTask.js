@@ -25,7 +25,7 @@ export function registerNewTask(bot) {
 
     if (!raw) {
       setPending(ctx.from.id, 'newtask_wizard', { step: 'title', roomId: room?.id ?? null, fields: {} });
-      return ctx.reply("📝 Starting a new task draft. What's the title? (/cancel to stop)", forceReplyExtra(ctx));
+      return ctx.reply('📝 New task — Title? (/cancel to stop)', forceReplyExtra(ctx));
     }
 
     const [title, description, reward, requiredOutput, category, skillsRaw, maxAssigneesRaw] = raw

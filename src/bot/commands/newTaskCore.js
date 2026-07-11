@@ -133,9 +133,9 @@ export function taskCreatedMessage(task) {
 const WIZARD_STEP_ORDER = ['title', 'description', 'reward', 'requiredOutput', 'category', 'skills', 'maxAssignees'];
 const WIZARD_PROMPTS = {
   description: '📄 Description?',
-  reward: '💰 Reward? (type "skip" to leave blank)',
-  requiredOutput: '📦 Required output format? (type "skip" to leave blank)',
-  maxAssignees: '👥 How many contributors can be assigned at once? (type "skip" for 1)',
+  reward: '💰 Reward? (or "skip")',
+  requiredOutput: '📦 Output format? (or "skip")',
+  maxAssignees: '👥 Max assignees? (or "skip" = 1)',
 };
 
 // Steps answered via inline keyboard, not free text - a stray text message
@@ -208,7 +208,7 @@ export async function handleNewTaskCategoryChoice(ctx, entry, value) {
     lastUserMessageId,
   });
   await ctx.editMessageText(
-    [`🏷️ Category: ${category || '(none)'}`, '', `🛠️ Pick skills for this task${category ? ` (${category})` : ''}, then Done:`].join('\n'),
+    [`🏷️ ${category || 'No category'}`, `🛠️ Skills${category ? ` (${category})` : ''} — tap to pick, then Done`].join('\n'),
     skillsKeyboard(category, [])
   ).catch(() => {});
 }

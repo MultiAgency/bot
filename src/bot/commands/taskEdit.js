@@ -24,15 +24,15 @@ const EDIT_FIELDS = [
 const TEXT_FIELD_PROMPTS = {
   title: '📌 New title?',
   description: '📄 New description?',
-  reward: '💰 New reward? (type "skip" to clear)',
-  requiredOutput: '📦 New required output? (type "skip" to clear)',
+  reward: '💰 New reward? (or "skip")',
+  requiredOutput: '📦 New output? (or "skip")',
   maxAssignees: '👥 New max assignees?',
 };
 
 function editMenuText(task) {
   return taskSummaryText(task, {
     heading: `✏️ Editing Task #${task.id}`,
-    footer: '👇 Tap a field to change it, or Done when finished.',
+    footer: '👇 Tap a field, or Done',
   });
 }
 
@@ -94,7 +94,7 @@ export function registerTaskEdit(bot) {
       updatePending(ctx.from.id, { field: 'category' });
       await ctx.answerCbQuery();
       return ctx.editMessageText(
-        `✏️ Editing Task #${id}\n\n🏷️ Choose a new category:`,
+        `✏️ Task #${id} — New category:`,
         categoryKeyboard(`task_edit_category:${id}`)
       ).catch(() => {});
     }
@@ -103,7 +103,7 @@ export function registerTaskEdit(bot) {
       updatePending(ctx.from.id, { field: 'skills', stagingSkills: task.requiredSkills || [] });
       await ctx.answerCbQuery();
       return ctx.editMessageText(
-        `✏️ Editing Task #${id}\n\n🛠️ Pick skills${task.category ? ` (${task.category})` : ''}, then Done:`,
+        `✏️ Task #${id} — Skills${task.category ? ` (${task.category})` : ''}, then Done:`,
         skillsKeyboard(task.category, task.requiredSkills || [], {
           togglePrefix: `task_edit_skill:${id}`,
           doneAction: `task_edit_skills_done:${id}`,
