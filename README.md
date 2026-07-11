@@ -34,7 +34,7 @@ npm run dev
 
 ## Bot commands
 
-Contributor: `/start` or `/help` (command guide), `/onboard <twitter_handle>`, `/tasks` (open tasks), `/apply <id>`, `/withdraw <id>` (only while unassigned), `/mytasks` (your applications and their status), `/submit <id> [content or link]` (only while assigned), `/status <id>` (a task's applications/history), `/cancel`. To submit a video, photo, or file, either send it with `/submit <id>` as the caption, or send `/submit <id>` alone and then the file/text within 5 minutes (see [Submissions](#submissions)).
+Contributor: `/start` or `/help` (command guide), `/onboard` (button + text wizard: role, desired income, skills), `/tasks` (open tasks), `/apply <id>`, `/withdraw <id>` (only while unassigned), `/mytasks` (your applications and their status), `/submit <id> [content or link]` (only while assigned), `/status <id>` (a task's applications/history), `/cancel`. To submit a video, photo, or file, either send it with `/submit <id>` as the caption, or send `/submit <id>` alone and then the file/text within 5 minutes (see [Submissions](#submissions)).
 
 Admin (global admins in `ADMIN_TELEGRAM_IDS`, or room admins for tasks belonging to their room — see [Multi-admin / room permissions](#multi-admin--room-permissions)):
 - `/newtask <title> | <description> | <reward> | <required output> | [category] | [skill1,skill2] | [max_assignees]`, or just `/newtask` for a step-by-step wizard
@@ -54,6 +54,7 @@ Admin (global admins in `ADMIN_TELEGRAM_IDS`, or room admins for tasks belonging
 ## Data model
 
 - **Task** — the work itself: title, description, reward, required output, `maxAssignees`, status (`DRAFT`/`OPEN`/`CLOSED`). `/newtask` creates one directly in `DRAFT`; tasks auto-drafted from chat signals are linked back to their `Signal` row via `Task.signalId`.
+- **Contributor** — `jobRole` (`JobRole` enum), `desiredIncome` (free text), `skillTags` (array), plus the trust/reputation fields set by `/onboard` and task completions.
 - **Application** — one contributor's candidacy for one task (`src/workflow.js` `APPLICATION_STATUS`). A contributor can hold multiple `Application` rows against the same task over time (e.g. re-applying after being declined), but the command layer blocks a second *active* (`APPLIED`/`ASSIGNED`) one.
 - **Submission** — one versioned attempt under an `Application` (`SUBMISSION_STATUS`). Resubmitting after `NEEDS_REVISION` creates a new row (`version` + 1) rather than overwriting — full revision history stays queryable.
 - `TaskHistory` / `ApplicationHistory` / `SubmissionHistory` — one audit trail per entity, same shape (`fromStatus`, `toStatus`, `actorTelegramId`, optional `note`).
@@ -72,31 +73,22 @@ Slash commands work in a group regardless of Privacy Mode — that part never ne
 
 Pipeline per message: a cheap length/word-count pre-filter runs first (no API cost), then a per-room rate limit (`SIGNAL_MAX_PER_HOUR`, default 20/hour — backed by a DB count of that room's `Signal` rows in the last hour, so it survives restarts/redeploys), then Claude (Haiku) scores it 0–10 and drafts a title/description/category/skills if it clears `SIGNAL_SCORE_THRESHOLD` (default 6). Every evaluated message is stored as a `Signal` row regardless of outcome (`status: DRAFTED` or `DISCARDED`), so discarded signals stay auditable. Use `/drafts` to review everything currently sitting in `DRAFT`, whether auto-drafted or created manually.
 
-**Decided, not just deferred: Telegram is the only signal source for now.** Twitter, Discord, GitHub, and news would each need their own credential/service decision (a Discord bot token, a GitHub App, a news API — Twitter itself is covered for *candidate scoring* via cookies, see below, but not wired up as a *signal source*). Revisit if/when there's a concrete need.
+**Decided, not just deferred: Telegram is the only signal source for now.** Twitter, Discord, GitHub, and news would each need their own credential/service decision (a Discord bot token, a GitHub App, a news API). Revisit if/when there's a concrete need.
 
 ## Candidate evaluation
 
-`/onboard <twitter_handle>` marks a contributor `isRegistered` and computes:
+`/onboard` runs a short wizard (`src/bot/commands/onboard.js`, state tracked via `src/bot/pendingActions.js`):
+1. **Role** — inline keyboard buttons (`bot.action` callback handler): Developer / Designer / Writer / Marketing / Community / Research / Video / Other. Stored as `Contributor.jobRole` (`JobRole` enum).
+2. **Desired income/rate** — free text (e.g. `"$500-1000/month"`, `"20 USDT/task"`), or `"skip"`. Stored as `Contributor.desiredIncome` (plain string — formats vary too much to structure further).
+3. **Skills** — comma-separated free text, or `"skip"`. Stored in the existing `Contributor.skillTags`, which is what `src/matching.js` already scores tasks against.
+
+On finishing, it marks the contributor `isRegistered` and computes:
 - `telegramScore` — real signal from profile completeness + in-system track record (`src/candidateEvaluation.js`)
-- `twitterScore` — see below
-- `socialTrustScore` / `eligibilityTier` — derived from the above
+- `socialTrustScore` / `eligibilityTier` — derived from `telegramScore`
 
 Only registered contributors can `/apply` to tasks.
 
-### Twitter/X scoring (cookie-based, unofficial)
-
-`twitterScore` uses **cookie-based profile access** (`src/twitterClient.js`, via `@the-convocation/twitter-scraper`), not the official paid X API. This was a deliberate choice to avoid the API's cost, but it comes with real, non-hypothetical risks:
-
-- **Violates X's Terms of Service** — automated access outside the official API is explicitly against X's ToS.
-- **The logged-in account can be suspended at any time**, with no warning and no appeal guaranteed.
-- **Breaks whenever X changes its internal endpoints** — no SLA, no advance notice; fixes depend on the open-source library catching up.
-- **The cookie is a live session credential** — whoever holds it can act as that account (post, DM, etc.), not just read profiles. Keep it in `TWITTER_COOKIES` (env var) only, never commit it.
-
-**Use a dedicated/throwaway X account for this, not the project's main brand account.** If that account gets suspended, `twitterScore` just goes back to `null` (unscored) — `computeTwitterScore` never throws and never fabricates a score, so the rest of the pipeline (registration, matching) keeps working either way.
-
-Scoring is a lightweight heuristic over public profile fields (account age, tweet count, follower/following ratio, verified status) — not the richer signals (engagement rate, content relevance) the official API would give. See `scoreTwitterProfile` in `src/candidateEvaluation.js`.
-
-To get `TWITTER_COOKIES`: log into the throwaway account in a browser, export its cookies (e.g. via a browser extension like "Cookie-Editor" or your devtools' Application/Storage panel) as a JSON array of `"name=value; Domain=..."` strings, and set that as the env var.
+**Twitter/X handle collection was removed from onboarding** (previously `/onboard <twitter_handle>`) in favor of the role/income/skills flow above. The cookie-based scoring infrastructure (`src/twitterClient.js`, `computeTwitterScore` in `src/candidateEvaluation.js`, `TWITTER_COOKIES` env var) is still there and still functional — `computeTwitterScore` just returns `null` immediately since `Contributor.twitterHandle` is never set by the current flow, which `computeSocialTrustScore` already treats as "unscored" rather than "zero trust." It's dead code from the product's perspective right now, kept in case Twitter-based evaluation is wired back in later (e.g. as a separate opt-in command) rather than deleted outright.
 
 ## Matching engine
 
@@ -151,6 +143,6 @@ Smaller known limitations:
 - Two-step submission and the `/newtask` wizard use in-memory pending state (`src/bot/pendingActions.js`) — resets on restart/redeploy, and doesn't work across multiple bot instances (not an issue at the current single-instance scale, see DEPLOY.md).
 - AI review still doesn't cover every document type (legacy `.doc`, `.xlsx`, etc.) — only PDF (via Claude) and `.docx`/`.txt`/`.md`/`.csv` (via local extraction) are wired up.
 - `/mytasks`, `/alltasks`, and `/applicants` are capped at their most recent results with no pagination — fine at pilot scale, but older items will scroll out of view once volume grows.
-- Twitter cookie-based scoring is unofficial and can stop working at any time if X changes its internal endpoints or the linked account gets suspended — `twitterScore` falls back to `null` when that happens, it doesn't crash anything.
+- Twitter cookie-based scoring code (`src/twitterClient.js`) is currently unreachable from any command — `/onboard` no longer collects a Twitter handle (see [Candidate evaluation](#candidate-evaluation)). Kept in place rather than deleted in case it's wired back in later.
 - `/mytasks` has no status filter (unlike `/alltasks [status]`) — for a contributor with many applications there's no way to narrow the list yet.
 - The applicant-ranking formula's "availability" signal only tracks `ASSIGNED` application count, not deadline pressure or contributor-declared capacity.

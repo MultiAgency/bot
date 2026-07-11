@@ -6,7 +6,7 @@ function buildGuideLines(ctx) {
     'Welcome to the MultiAgency Contributor Bot!',
     '',
     'Contributor commands:',
-    '/onboard <twitter_handle> - register and get evaluated before you can apply to tasks',
+    '/onboard - pick your role, desired income, and skills before you can apply to tasks',
     '/tasks - view open tasks',
     '/apply <id> - apply to a task (admin assigns from applicants)',
     '/withdraw <id> - withdraw your (unassigned) application',

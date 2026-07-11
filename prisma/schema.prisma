@@ -54,16 +54,35 @@ enum EligibilityTier {
   RESTRICTED
 }
 
+enum JobRole {
+  DEVELOPER
+  DESIGNER
+  WRITER
+  MARKETING
+  COMMUNITY
+  RESEARCH
+  VIDEO
+  OTHER
+}
+
 model Contributor {
   id                      Int             @id @default(autoincrement())
   telegramUserId          BigInt          @unique
   telegramUsername        String?
   displayName             String?
 
-  // Registration / onboarding (candidate evaluation via Twitter + Telegram)
+  // Registration / onboarding. /onboard collects jobRole, desiredIncome, and
+  // skillTags via a button+text wizard (src/bot/commands/onboard.js).
+  // twitterHandle/twitterScore are no longer collected by that flow - kept
+  // here (and in src/candidateEvaluation.js / src/twitterClient.js) as
+  // unused-but-functional infrastructure in case Twitter-based evaluation
+  // is reintroduced later; computeTwitterScore already returns null when
+  // twitterHandle is unset, so this degrades gracefully.
   twitterHandle           String?
   isRegistered            Boolean         @default(false)
   eligibilityTier         EligibilityTier @default(NEW)
+  jobRole                 JobRole?
+  desiredIncome           String?
   twitterScore            Float?
   telegramScore           Float?
   socialTrustScore        Float?

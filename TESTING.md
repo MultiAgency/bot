@@ -43,7 +43,7 @@ All three tasks should appear, still in `DRAFT`.
 ```
 /approve <id>
 ```
-Expect: task flips to `OPEN`; reply confirms `(max N assignees)`. If any contributor is already `/onboard`ed, they should get a DM suggesting the task (best done with the contributor account already registered from a previous run — see step 4 first, then come back and approve a second task to see the nudge fire).
+Expect: task flips to `OPEN`; reply confirms `(max N assignees)`. If any contributor has already completed `/onboard`, they should get a DM suggesting the task (best done with the contributor account already onboarded from a previous run — see step 4 first, then come back and approve a second task to see the nudge fire).
 
 ```
 /tasks
@@ -55,9 +55,9 @@ Should list the task as `0/N assigned`.
 As the **contributor** account:
 
 ```
-/onboard mytwitterhandle
+/onboard
 ```
-Expect a reply with `telegramScore`, `twitterScore` (or "unavailable" if `TWITTER_COOKIES` isn't configured — that's expected, not a bug), `socialTrustScore`, and a tier.
+Expect an inline keyboard of roles (Developer/Designer/Writer/Marketing/Community/Research/Video/Other) — tap one. Then answer the two text prompts: desired income/rate (or `skip`), then skills comma-separated (or `skip`). Expect a final reply with your role, income, skills, `telegramScore`, and a trust tier.
 
 ```
 /apply <id>
@@ -151,7 +151,7 @@ For a fast smoke test after a deploy, this is the shortest path that touches eve
 ```
 /newtask Test task | Say hello | 5 USDT | a reply | content | writing | 1
 /approve <id>
-/onboard testhandle          (contributor account)
+/onboard                      (contributor account - tap a role button, then answer income/skills prompts)
 /apply <id>                   (contributor account)
 /applicants <id>
 /assign <application_id>
