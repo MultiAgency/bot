@@ -1,5 +1,6 @@
 import { prisma } from '../../db.js';
 import { APPLICATION_STATUS_EMOJI, SUBMISSION_STATUS_EMOJI } from '../emoji.js';
+import { taskSummaryText } from './newTaskCore.js';
 
 export function registerMyTasks(bot) {
   bot.command('mytasks', async (ctx) => {
@@ -22,14 +23,17 @@ export function registerMyTasks(bot) {
       return ctx.reply("📭 You have no applications yet. Use /tasks to see what's open.");
     }
 
-    const lines = applications.map((a) => {
+    const blocks = applications.map((a) => {
       const latest = a.submissions[0];
       const submissionInfo = latest
-        ? `\n${SUBMISSION_STATUS_EMOJI[latest.status] || '📄'} Latest submission v${latest.version}: ${latest.status}`
-        : '';
-      return `📋 #${a.taskId} "${a.task.title}"\n${APPLICATION_STATUS_EMOJI[a.status] || '📌'} ${a.status}${submissionInfo}`;
+        ? `${SUBMISSION_STATUS_EMOJI[latest.status] || '📄'} Latest submission v${latest.version}: ${latest.status}`
+        : null;
+      return taskSummaryText(a.task, {
+        heading: `📋 Task #${a.taskId} — ${APPLICATION_STATUS_EMOJI[a.status] || '📌'} ${a.status}`,
+        footer: submissionInfo,
+      });
     });
 
-    await ctx.reply(`🗂 Your applications:\n\n${lines.join('\n\n')}`);
+    await ctx.reply(`🗂 Your applications:\n\n${blocks.join('\n\n〰️〰️〰️\n\n')}`);
   });
 }

@@ -3,6 +3,7 @@ import { isAdmin } from '../roomAuth.js';
 import { listRoomIdsForAdmin } from '../../rooms.js';
 import { TASK_STATUS, APPLICATION_STATUS } from '../../workflow.js';
 import { TASK_STATUS_EMOJI } from '../emoji.js';
+import { taskSummaryText } from './newTaskCore.js';
 
 export function registerAllTasks(bot) {
   bot.command('alltasks', async (ctx) => {
@@ -34,11 +35,15 @@ export function registerAllTasks(bot) {
       return ctx.reply('📭 No tasks found.');
     }
 
-    const lines = tasks.map((t) => {
+    const blocks = tasks.map((t) => {
       const assignedCount = t.applications.filter((a) => a.status === APPLICATION_STATUS.ASSIGNED).length;
-      return `${TASK_STATUS_EMOJI[t.status] || '📌'} #${t.id} "${t.title}" — ${t.status} (👥 ${assignedCount}/${t.maxAssignees} assigned)`;
+      return taskSummaryText(t, {
+        heading: `${TASK_STATUS_EMOJI[t.status] || '📌'} Task #${t.id} — ${t.status} (👥 ${assignedCount}/${t.maxAssignees} assigned)`,
+      });
     });
 
-    await ctx.reply([`📚 Tasks${statusArg ? ` (${statusArg})` : ''}:`, ...lines].join('\n'));
+    await ctx.reply(
+      [`📚 Tasks${statusArg ? ` (${statusArg})` : ''}:`, '', blocks.join('\n\n〰️〰️〰️\n\n')].join('\n')
+    );
   });
 }

@@ -2,6 +2,7 @@ import { prisma } from '../../db.js';
 import { isAdmin } from '../roomAuth.js';
 import { listRoomIdsForAdmin } from '../../rooms.js';
 import { TASK_STATUS } from '../../workflow.js';
+import { taskSummaryText } from './newTaskCore.js';
 
 export function registerDrafts(bot) {
   bot.command('drafts', async (ctx) => {
@@ -24,12 +25,17 @@ export function registerDrafts(bot) {
       return ctx.reply('📭 No pending drafts.');
     }
 
-    const lines = draftTasks.map((t) => {
-      const source = t.signal ? `🤖 auto-drafted from signal (score-gated, reasoning: ${t.signal.summary})` : '✍️ created manually';
-      const room = t.room?.chatTitle ? ` in "${t.room.chatTitle}"` : '';
-      return `📝 #${t.id} "${t.title}"${room}\n${source}\n✅ Use /approve ${t.id} to review.`;
+    const blocks = draftTasks.map((t) => {
+      const source = t.signal
+        ? `🤖 Auto-drafted from signal (reasoning: ${t.signal.summary})`
+        : '✍️ Created manually';
+      const room = t.room?.chatTitle ? `🏠 Room: ${t.room.chatTitle}` : null;
+      return taskSummaryText(t, {
+        heading: `📝 Task #${t.id} (Draft)`,
+        footer: [source, room, `✅ Use /approve ${t.id} to review.`].filter(Boolean).join('\n'),
+      });
     });
 
-    await ctx.reply(`📥 Pending drafts:\n\n${lines.join('\n\n')}`);
+    await ctx.reply(`📥 Pending drafts:\n\n${blocks.join('\n\n〰️〰️〰️\n\n')}`);
   });
 }
