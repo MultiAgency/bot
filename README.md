@@ -34,7 +34,7 @@ npm run dev
 
 ## Bot commands
 
-Contributor: `/start` or `/help` (command guide), `/onboard` (button + text wizard: role, desired income, skills), `/tasks` (open tasks), `/apply <id>`, `/withdraw <id>` (only while unassigned), `/mytasks` (your applications and their status), `/submit <id> [content or link]` (only while assigned), `/status <id>` (a task's applications/history), `/cancel`. To submit a video, photo, or file, either send it with `/submit <id>` as the caption, or send `/submit <id>` alone and then the file/text within 5 minutes (see [Submissions](#submissions)).
+Contributor: `/start` or `/help` (command guide), `/onboard` (fully button-driven wizard: role, desired income, skills — see [Candidate evaluation](#candidate-evaluation)), `/tasks` (open tasks), `/apply <id>`, `/withdraw <id>` (only while unassigned), `/mytasks` (your applications and their status), `/submit <id> [content or link]` (only while assigned), `/status <id>` (a task's applications/history), `/cancel`. To submit a video, photo, or file, either send it with `/submit <id>` as the caption, or send `/submit <id>` alone and then the file/text within 5 minutes (see [Submissions](#submissions)).
 
 Admin (global admins in `ADMIN_TELEGRAM_IDS`, or room admins for tasks belonging to their room — see [Multi-admin / room permissions](#multi-admin--room-permissions)):
 - `/newtask <title> | <description> | <reward> | <required output> | [category] | [skill1,skill2] | [max_assignees]`, or just `/newtask` for a step-by-step wizard
@@ -54,7 +54,7 @@ Admin (global admins in `ADMIN_TELEGRAM_IDS`, or room admins for tasks belonging
 ## Data model
 
 - **Task** — the work itself: title, description, reward, required output, `maxAssignees`, status (`DRAFT`/`OPEN`/`CLOSED`). `/newtask` creates one directly in `DRAFT`; tasks auto-drafted from chat signals are linked back to their `Signal` row via `Task.signalId`.
-- **Contributor** — `jobRole` (`JobRole` enum), `desiredIncome` (free text), `skillTags` (array), plus the trust/reputation fields set by `/onboard` and task completions.
+- **Contributor** — `jobRole` (`JobRole` enum), `desiredIncome` (string — one of a fixed set of button labels, see [Candidate evaluation](#candidate-evaluation)), `skillTags` (array), plus the trust/reputation fields set by `/onboard` and task completions.
 - **Application** — one contributor's candidacy for one task (`src/workflow.js` `APPLICATION_STATUS`). A contributor can hold multiple `Application` rows against the same task over time (e.g. re-applying after being declined), but the command layer blocks a second *active* (`APPLIED`/`ASSIGNED`) one.
 - **Submission** — one versioned attempt under an `Application` (`SUBMISSION_STATUS`). Resubmitting after `NEEDS_REVISION` creates a new row (`version` + 1) rather than overwriting — full revision history stays queryable.
 - `TaskHistory` / `ApplicationHistory` / `SubmissionHistory` — one audit trail per entity, same shape (`fromStatus`, `toStatus`, `actorTelegramId`, optional `note`).
@@ -77,10 +77,12 @@ Pipeline per message: a cheap length/word-count pre-filter runs first (no API co
 
 ## Candidate evaluation
 
-`/onboard` runs a short wizard (`src/bot/commands/onboard.js`, state tracked via `src/bot/pendingActions.js`):
-1. **Role** — inline keyboard buttons (`bot.action` callback handler): Developer / Designer / Writer / Marketing / Community / Research / Video / Other. Stored as `Contributor.jobRole` (`JobRole` enum).
-2. **Desired income/rate** — free text (e.g. `"$500-1000/month"`, `"20 USDT/task"`), or `"skip"`. Stored as `Contributor.desiredIncome` (plain string — formats vary too much to structure further).
-3. **Skills** — comma-separated free text, or `"skip"`. Stored in the existing `Contributor.skillTags`, which is what `src/matching.js` already scores tasks against.
+`/onboard` runs a short wizard (`src/bot/commands/onboard.js`, state tracked via `src/bot/pendingActions.js`) that is **entirely button-driven, no free text**:
+1. **Role** — inline keyboard, single choice: Developer / Designer / Writer / Marketing / Community / Research / Video / Other. Stored as `Contributor.jobRole` (`JobRole` enum).
+2. **Desired income/rate** — inline keyboard, single choice from fixed buckets (`< $100/mo` through `$3000+/mo`, plus `Per-task / negotiable`). Stored as `Contributor.desiredIncome` (the button's label text).
+3. **Skills** — inline keyboard, multi-select: tap to toggle (✅ marks selected), tap **Done** to finish. The options shown depend on the chosen role (e.g. Developer sees Solidity/Rust/JS-TS/..., Designer sees UI Design/UX Design/...; see `SKILLS_BY_ROLE` in `onboard.js`). Stored in the existing `Contributor.skillTags`, which is what `src/matching.js` already scores tasks against.
+
+**Why no free text:** in a group, a plain text message only reaches the bot if Privacy Mode is disabled *and* the bot was removed/re-added after that (see [Signal detection](#signal-detection-auto-drafting-tasks-from-chat)) — a button press (callback query) reaches the bot regardless of that setting. An earlier text-based version of this wizard would silently never receive the contributor's answer in a group that hadn't done that setup; the button-only version works everywhere out of the box.
 
 On finishing, it marks the contributor `isRegistered` and computes:
 - `telegramScore` — real signal from profile completeness + in-system track record (`src/candidateEvaluation.js`)

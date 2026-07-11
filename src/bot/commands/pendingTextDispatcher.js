@@ -1,7 +1,6 @@
 import { peekPending, clearPending } from '../pendingActions.js';
 import { validateAssignmentForSubmission, submitTextOrLink, replyForTextSubmission } from './submitCore.js';
 import { handleNewTaskWizardStep } from './newTaskCore.js';
-import { handleOnboardWizardStep } from './onboard.js';
 
 // Dispatches a plain (non-command) text message to whichever pending
 // conversational flow the sender is in: two-step submission or the
@@ -34,14 +33,8 @@ export function registerPendingTextDispatcher(bot) {
       return handleNewTaskWizardStep(ctx, entry);
     }
 
-    if (entry.type === 'onboard_wizard') {
-      // The job-role step is button-based (see the bot.action handler in
-      // onboard.js) - if we're still on it, a stray text message here isn't
-      // part of the flow. Fall through to next() rather than misinterpret it.
-      if (entry.data.step === 'jobRole') return next();
-      return handleOnboardWizardStep(ctx, entry);
-    }
-
+    // onboard_wizard is entirely button-driven (see onboard.js) - a stray
+    // text message while it's pending isn't part of the flow, fall through.
     return next();
   });
 }

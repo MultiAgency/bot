@@ -57,7 +57,12 @@ As the **contributor** account:
 ```
 /onboard
 ```
-Expect an inline keyboard of roles (Developer/Designer/Writer/Marketing/Community/Research/Video/Other) — tap one. Then answer the two text prompts: desired income/rate (or `skip`), then skills comma-separated (or `skip`). Expect a final reply with your role, income, skills, `telegramScore`, and a trust tier.
+Entirely button-driven — no typing required:
+1. Tap a role (Developer/Designer/Writer/Marketing/Community/Research/Video/Other).
+2. Tap an income bucket.
+3. Tap one or more skills (they show a `✅` when selected, tap again to deselect), then tap **Done**. The skill options shown should match the role you picked in step 1.
+
+Expect a final reply with your role, income, skills, `telegramScore`, and a trust tier. Repeat this in the **test group** too, not just DM — since it's all callback queries (button presses), it should work identically there even without Privacy Mode disabled, unlike an earlier free-text version of this wizard which would silently not receive typed answers in a group.
 
 ```
 /apply <id>
@@ -151,7 +156,7 @@ For a fast smoke test after a deploy, this is the shortest path that touches eve
 ```
 /newtask Test task | Say hello | 5 USDT | a reply | content | writing | 1
 /approve <id>
-/onboard                      (contributor account - tap a role button, then answer income/skills prompts)
+/onboard                      (contributor account - tap role, income, skills, then Done)
 /apply <id>                   (contributor account)
 /applicants <id>
 /assign <application_id>
