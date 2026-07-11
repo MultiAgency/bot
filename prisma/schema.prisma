@@ -216,6 +216,10 @@ model Room {
   chatId          BigInt   @unique
   chatTitle       String?
   signalsEnabled  Boolean  @default(false)
+  // Room-scoped "AI mode" (src/bot/commands/aiToggle.js): when on, plain
+  // messages and commands in this room are routed to the AI agent
+  // (src/ai/agent.js) instead of the classic command handlers.
+  aiEnabled       Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

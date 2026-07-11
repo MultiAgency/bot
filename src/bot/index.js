@@ -1,4 +1,6 @@
 import { Telegraf } from 'telegraf';
+import { registerAiRouter } from './commands/aiRouter.js';
+import { registerAiToggle } from './commands/aiToggle.js';
 import { registerStart } from './commands/start.js';
 import { registerOnboard } from './commands/onboard.js';
 import { registerNewTask } from './commands/newTask.js';
@@ -29,6 +31,12 @@ import { registerSignalListener } from './commands/signalListener.js';
 export function createBot(token) {
   const bot = new Telegraf(token);
 
+  // Must be registered before every other text/command handler: in a room
+  // with AI mode on, this swallows the update so nothing below it (classic
+  // commands, signal detection) ever sees it. /ai itself is exempted so a
+  // room can always be switched back off.
+  registerAiRouter(bot);
+  registerAiToggle(bot);
   registerStart(bot);
   registerOnboard(bot);
   registerNewTask(bot);

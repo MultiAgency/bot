@@ -149,6 +149,16 @@ Task should flip `OPEN → CLOSED → OPEN`. Try `/apply` while `CLOSED` — sho
 
 With two admin accounts, try running `/assign <same application_id>` from both at nearly the same time. Only one should succeed; the other should get "already handled" instead of a silent double-write. (Easiest to actually trigger this by scripting two near-simultaneous API calls rather than manual typing — mentioned here for completeness, not required for a routine smoke test.)
 
+## 12. AI mode
+
+- As a room admin, run `/ai` alone → confirms current state (OFF by default), then `/ai on`.
+- Send a plain message (no slash) like "what tasks are open?" → agent should call `list_open_tasks` and reply with a short summary, not a raw dump.
+- As an admin, describe a task in natural language ("create a task: write a tweet thread about X, reward 20 USDT") → agent should post the same Approve/Reject/Edit card `/newtask` posts. Tap Approve and confirm it behaves identically to the classic flow.
+- As a non-admin, ask the agent to create a task → should be told no (same permission check as `/newtask`), not silently ignored.
+- Try typing `/newtask ...` directly while AI mode is on → should NOT create a task (the classic command is intercepted); only `/ai off` should still work as a bare command.
+- `/ai off` → confirm `/newtask` etc. work normally again immediately after.
+- Tap an existing Approve/Apply/Edit button while AI mode is on → should still work (buttons are a different update type, never intercepted).
+
 ## Quick reference: full happy-path in one block
 
 For a fast smoke test after a deploy, this is the shortest path that touches every entity:

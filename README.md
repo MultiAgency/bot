@@ -50,6 +50,7 @@ Admin (global admins in `ADMIN_TELEGRAM_IDS`, or room admins for tasks belonging
 - `/review <application_id> approve|reject|revise [note]` — decides that application's latest submission; approve/reject also close the application (Completed/Rejected)
 - `/addroomadmin` / `/removeroomadmin` — reply to a user's message inside a group to grant/revoke room-admin status there
 - `/roomadmins` — list a room's admins
+- `/ai on` / `/ai off` — switch that group to a natural-language AI agent instead of commands, or back (see [AI mode](#ai-mode-natural-language-instead-of-commands))
 
 ## Data model
 
@@ -123,6 +124,14 @@ The document's mime type is captured in `submissionFileMetadata` at upload time 
 ## AI-assisted task drafting
 
 `/drafttask <short prompt>` sends the prompt to Claude (`draftTask` in `src/ai/claude.js`) and creates a `DRAFT` task from the structured result (title, description, required output, category, skill tags) — same status and same `/approve` gate as a manually-created task, it just skips typing out the pipe-delimited syntax. If Claude's response doesn't parse or is missing a title/description, it tells you to use `/newtask` instead rather than creating a broken task.
+
+## AI mode (natural language instead of commands)
+
+`/ai on` (room admin, run inside a group) switches that group over to a Claude tool-use agent (`src/ai/agent.js`) instead of slash commands — `/ai off` switches it back. While on, every message in that room (commands included, except `/ai` itself) is routed to the agent instead of the classic handlers (`src/bot/commands/aiRouter.js`, registered before everything else in `src/bot/index.js`).
+
+The agent never mutates anything directly. Its tools (`src/ai/agentTools.js`) split into read-only lookups (`list_open_tasks`, `get_task_details`, `list_my_applications`) and proposal tools that just *show* the same confirmation cards the classic commands already use — `create_task_draft` posts the Approve/Reject/Edit card, `propose_apply` posts the Apply/Cancel card, `show_task_review_card` re-shows the Approve/Reject/Edit card for an existing draft. The actual state change only happens when a human taps the button, which goes through the exact same permission checks and atomic guards as `/approve`, `/apply`, etc. always did — inline keyboard button taps are a separate Telegram update type from text messages, so they're never intercepted by the AI router and keep working identically whether AI mode is on or off.
+
+It's single-turn (no memory of earlier messages in the room) and admin-gated the same way task creation always was — a non-admin asking the agent to create a task just gets told no, the same as typing `/newtask` would.
 
 ## Multi-admin / room permissions
 

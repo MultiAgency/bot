@@ -23,6 +23,17 @@ export async function isSignalsEnabled(chatId) {
   return room?.signalsEnabled ?? false;
 }
 
+export async function setAiEnabled(chatId, enabled) {
+  return prisma.room
+    .update({ where: { chatId: BigInt(chatId) }, data: { aiEnabled: enabled } })
+    .catch(() => null); // no-op if the room row doesn't exist yet
+}
+
+export async function isAiEnabled(chatId) {
+  const room = await prisma.room.findUnique({ where: { chatId: BigInt(chatId) } });
+  return room?.aiEnabled ?? false;
+}
+
 export async function isRoomAdmin(roomId, telegramUserId) {
   if (!roomId) return false;
   const entry = await prisma.roomAdmin.findUnique({
