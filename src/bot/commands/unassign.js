@@ -1,12 +1,13 @@
 import { prisma } from '../../db.js';
 import { canManageTask } from '../roomAuth.js';
 import { APPLICATION_STATUS, assertApplicationTransition } from '../../workflow.js';
+import { commandArgs } from '../commandArgs.js';
 
 export function registerUnassign(bot) {
   bot.command('unassign', async (ctx) => {
-    const parts = ctx.message.text.split(' ');
-    const id = Number(parts[1]);
-    const reason = parts.slice(2).join(' ').trim();
+    const parts = commandArgs(ctx);
+    const id = Number(parts[0]);
+    const reason = parts.slice(1).join(' ').trim();
     if (!id || !reason) return ctx.reply('ℹ️ Usage: /unassign <application_id> <reason>');
 
     const application = await prisma.application.findUnique({

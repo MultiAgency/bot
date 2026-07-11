@@ -4,6 +4,7 @@ import { canManageTask } from '../roomAuth.js';
 import { rankApplicationsForTask } from '../../routing.js';
 import { APPLICATION_STATUS } from '../../workflow.js';
 import { TIER_EMOJI } from '../emoji.js';
+import { commandArgs } from '../commandArgs.js';
 
 function applicantCardText(taskId, rank, application, score) {
   const c = application.contributor;
@@ -20,7 +21,7 @@ function applicantCardText(taskId, rank, application, score) {
 
 export function registerApplicants(bot) {
   bot.command('applicants', async (ctx) => {
-    const id = Number(ctx.message.text.split(' ')[1]);
+    const id = Number(commandArgs(ctx)[0]);
     if (!id) return ctx.reply('ℹ️ Usage: /applicants <task_id>');
 
     const task = await prisma.task.findUnique({ where: { id } });

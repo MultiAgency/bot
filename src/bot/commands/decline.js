@@ -2,6 +2,7 @@ import { Markup } from 'telegraf';
 import { prisma } from '../../db.js';
 import { canManageTask } from '../roomAuth.js';
 import { APPLICATION_STATUS, assertApplicationTransition } from '../../workflow.js';
+import { commandArgs } from '../commandArgs.js';
 
 // Shared by the /decline command and the application_decline:<id> button
 // (see applicants.js) - the button path doesn't collect a note.
@@ -52,9 +53,9 @@ export async function declineApplication(ctx, id, note = null) {
 
 export function registerDecline(bot) {
   bot.command('decline', async (ctx) => {
-    const parts = ctx.message.text.split(' ');
-    const id = Number(parts[1]);
-    const note = parts.slice(2).join(' ').trim() || null;
+    const parts = commandArgs(ctx);
+    const id = Number(parts[0]);
+    const note = parts.slice(1).join(' ').trim() || null;
     if (!id) return ctx.reply('ℹ️ Usage: /decline <application_id> [note]');
 
     const result = await declineApplication(ctx, id, note);

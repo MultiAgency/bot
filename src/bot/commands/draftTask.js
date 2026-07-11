@@ -1,5 +1,6 @@
 import { draftTask } from '../../ai/claude.js';
 import { resolveCreationContext, createDraftTask, taskCreatedMessage } from './newTaskCore.js';
+import { commandRest } from '../commandArgs.js';
 
 export function registerDraftTask(bot) {
   bot.command('drafttask', async (ctx) => {
@@ -12,7 +13,7 @@ export function registerDraftTask(bot) {
       );
     }
 
-    const shortPrompt = ctx.message.text.split(' ').slice(1).join(' ').trim();
+    const shortPrompt = commandRest(ctx);
     if (!shortPrompt) {
       return ctx.reply('ℹ️ Usage: /drafttask <short description of what you need>\n🤖 Claude will expand it into a full task draft for you to review.');
     }

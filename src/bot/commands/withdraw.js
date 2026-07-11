@@ -1,9 +1,10 @@
 import { prisma } from '../../db.js';
 import { APPLICATION_STATUS, assertApplicationTransition } from '../../workflow.js';
+import { commandArgs } from '../commandArgs.js';
 
 export function registerWithdraw(bot) {
   bot.command('withdraw', async (ctx) => {
-    const id = Number(ctx.message.text.split(' ')[1]);
+    const id = Number(commandArgs(ctx)[0]);
     if (!id) return ctx.reply('ℹ️ Usage: /withdraw <task_id>');
 
     const contributor = await prisma.contributor.findUnique({

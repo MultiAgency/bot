@@ -1,11 +1,12 @@
 import { validateAssignmentForSubmission, submitTextOrLink, replyForTextSubmission } from './submitCore.js';
 import { setPending } from '../pendingActions.js';
+import { commandArgs } from '../commandArgs.js';
 
 export function registerSubmit(bot) {
   bot.command('submit', async (ctx) => {
-    const parts = ctx.message.text.split(' ');
-    const id = Number(parts[1]);
-    const content = parts.slice(2).join(' ').trim();
+    const parts = commandArgs(ctx);
+    const id = Number(parts[0]);
+    const content = parts.slice(1).join(' ').trim();
 
     if (!id) {
       return ctx.reply(

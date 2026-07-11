@@ -3,6 +3,7 @@ import { prisma } from '../../db.js';
 import { canManageTask } from '../roomAuth.js';
 import { TASK_STATUS, assertTaskTransition } from '../../workflow.js';
 import { rankCandidatesForTask } from '../../routing.js';
+import { commandArgs } from '../commandArgs.js';
 
 const NUDGE_TOP_N = 5;
 
@@ -89,7 +90,7 @@ export async function rejectTask(ctx, id) {
 
 export function registerApprove(bot) {
   bot.command('approve', async (ctx) => {
-    const id = Number(ctx.message.text.split(' ')[1]);
+    const id = Number(commandArgs(ctx)[0]);
     if (!id) return ctx.reply('ℹ️ Usage: /approve <task_id>');
 
     const result = await approveTask(ctx, id);

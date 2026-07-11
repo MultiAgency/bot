@@ -4,6 +4,7 @@ import { listRoomIdsForAdmin } from '../../rooms.js';
 import { TASK_STATUS, APPLICATION_STATUS } from '../../workflow.js';
 import { TASK_STATUS_EMOJI } from '../emoji.js';
 import { taskSummaryText } from './newTaskCore.js';
+import { commandArgs } from '../commandArgs.js';
 
 export function registerAllTasks(bot) {
   bot.command('alltasks', async (ctx) => {
@@ -14,7 +15,7 @@ export function registerAllTasks(bot) {
       return ctx.reply('🚫 Only admins can view all tasks.');
     }
 
-    const statusArg = ctx.message.text.split(' ')[1]?.toUpperCase();
+    const statusArg = commandArgs(ctx)[0]?.toUpperCase();
     if (statusArg && !TASK_STATUS[statusArg]) {
       return ctx.reply(`ℹ️ Usage: /alltasks [status]\nValid statuses: ${Object.keys(TASK_STATUS).join(', ')}`);
     }

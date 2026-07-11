@@ -2,10 +2,11 @@ import { prisma } from '../../db.js';
 import { canManageTask } from '../roomAuth.js';
 import { TASK_STATUS, assertTaskTransition } from '../../workflow.js';
 import { TASK_STATUS_EMOJI } from '../emoji.js';
+import { commandArgs } from '../commandArgs.js';
 
 function registerTransitionCommand(bot, command, toStatus, verb) {
   bot.command(command, async (ctx) => {
-    const id = Number(ctx.message.text.split(' ')[1]);
+    const id = Number(commandArgs(ctx)[0]);
     if (!id) return ctx.reply(`ℹ️ Usage: /${command} <task_id>`);
 
     const task = await prisma.task.findUnique({ where: { id } });

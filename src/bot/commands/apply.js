@@ -3,6 +3,7 @@ import { prisma } from '../../db.js';
 import { TASK_STATUS, APPLICATION_STATUS } from '../../workflow.js';
 import { scoreApplicant } from '../../routing.js';
 import { notifyTaskManagers } from '../notifyAdmins.js';
+import { commandArgs } from '../commandArgs.js';
 
 // Shared by the /apply command and the task_apply:<id> button (see
 // tasks.js) - both just need a task id and a ctx to identify the
@@ -59,7 +60,7 @@ export async function applyToTask(ctx, id) {
 
 export function registerApply(bot) {
   bot.command('apply', async (ctx) => {
-    const id = Number(ctx.message.text.split(' ')[1]);
+    const id = Number(commandArgs(ctx)[0]);
     if (!id) return ctx.reply('ℹ️ Usage: /apply <task_id>');
 
     const result = await applyToTask(ctx, id);

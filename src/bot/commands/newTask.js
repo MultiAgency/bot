@@ -8,6 +8,7 @@ import {
   handleNewTaskSkillsDone,
 } from './newTaskCore.js';
 import { setPending, peekPending } from '../pendingActions.js';
+import { commandRest } from '../commandArgs.js';
 
 export function registerNewTask(bot) {
   bot.command('newtask', async (ctx) => {
@@ -20,7 +21,7 @@ export function registerNewTask(bot) {
       );
     }
 
-    const raw = ctx.message.text.split(' ').slice(1).join(' ').trim();
+    const raw = commandRest(ctx);
 
     if (!raw) {
       setPending(ctx.from.id, 'newtask_wizard', { step: 'title', roomId: room?.id ?? null, fields: {} });

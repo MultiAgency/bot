@@ -1,5 +1,6 @@
 import { canManageRoom } from '../roomAuth.js';
 import { getOrCreateRoom, setAiEnabled, isAiEnabled } from '../../rooms.js';
+import { commandArgs } from '../commandArgs.js';
 
 // Room-scoped "AI mode": when on, plain messages and other commands in this
 // room get routed to the AI agent (src/ai/agent.js) instead of the classic
@@ -11,7 +12,7 @@ export function registerAiToggle(bot) {
       return ctx.reply('ℹ️ AI mode is a per-group setting - run this inside the group you want it in.');
     }
 
-    const arg = ctx.message.text.split(' ')[1]?.toLowerCase();
+    const arg = commandArgs(ctx)[0]?.toLowerCase();
     const room = await getOrCreateRoom(ctx.chat.id, ctx.chat.title);
 
     if (!arg) {

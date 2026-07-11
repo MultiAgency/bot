@@ -6,6 +6,7 @@ import {
   assertSubmissionTransition,
   assertApplicationTransition,
 } from '../../workflow.js';
+import { commandArgs } from '../commandArgs.js';
 
 const DECISION_TO_SUBMISSION_STATUS = {
   approve: SUBMISSION_STATUS.APPROVED,
@@ -26,10 +27,10 @@ const DECISION_TO_APPLICATION_STATUS = {
 
 export function registerReview(bot) {
   bot.command('review', async (ctx) => {
-    const parts = ctx.message.text.split(' ');
-    const id = Number(parts[1]);
-    const decision = parts[2]?.toLowerCase();
-    const note = parts.slice(3).join(' ').trim() || null;
+    const parts = commandArgs(ctx);
+    const id = Number(parts[0]);
+    const decision = parts[1]?.toLowerCase();
+    const note = parts.slice(2).join(' ').trim() || null;
 
     if (!id || !DECISION_TO_SUBMISSION_STATUS[decision]) {
       return ctx.reply('ℹ️ Usage: /review <application_id> approve|reject|revise [note]');

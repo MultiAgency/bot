@@ -1,10 +1,11 @@
 import { prisma } from '../../db.js';
 import { APPLICATION_STATUS } from '../../workflow.js';
 import { TASK_STATUS_EMOJI, APPLICATION_STATUS_EMOJI, SUBMISSION_STATUS_EMOJI } from '../emoji.js';
+import { commandArgs } from '../commandArgs.js';
 
 export function registerStatus(bot) {
   bot.command('status', async (ctx) => {
-    const id = Number(ctx.message.text.split(' ')[1]);
+    const id = Number(commandArgs(ctx)[0]);
     if (!id) return ctx.reply('ℹ️ Usage: /status <task_id>');
 
     const task = await prisma.task.findUnique({

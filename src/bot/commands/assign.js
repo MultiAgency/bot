@@ -2,6 +2,7 @@ import { Markup } from 'telegraf';
 import { prisma } from '../../db.js';
 import { canManageTask } from '../roomAuth.js';
 import { APPLICATION_STATUS, assertApplicationTransition } from '../../workflow.js';
+import { commandArgs } from '../commandArgs.js';
 
 // Shared by the /assign command and the application_assign:<id> button
 // (see applicants.js).
@@ -62,7 +63,7 @@ export async function assignApplication(ctx, id) {
 
 export function registerAssign(bot) {
   bot.command('assign', async (ctx) => {
-    const id = Number(ctx.message.text.split(' ')[1]);
+    const id = Number(commandArgs(ctx)[0]);
     if (!id) return ctx.reply('ℹ️ Usage: /assign <application_id>');
 
     const result = await assignApplication(ctx, id);
