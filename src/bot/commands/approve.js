@@ -1,3 +1,4 @@
+import { Markup } from 'telegraf';
 import { prisma } from '../../db.js';
 import { canManageTask } from '../roomAuth.js';
 import { TASK_STATUS, assertTaskTransition } from '../../workflow.js';
@@ -63,6 +64,29 @@ export async function approveTask(ctx, id) {
   };
 }
 
+// Only DRAFT tasks can be rejected (discarded) - it's a straight delete
+// since a draft never has applications against it yet. Once a task is
+// Open/Closed, /close is the right tool instead.
+export async function rejectTask(ctx, id) {
+  const task = await prisma.task.findUnique({ where: { id } });
+  if (!task) return { error: `❌ Task #${id} not found.` };
+
+  if (!(await canManageTask(ctx, task))) {
+    return { error: "🚫 Only admins of this task's room (or global admins) can reject it." };
+  }
+
+  if (task.status !== TASK_STATUS.DRAFT) {
+    return { error: `❌ Only draft tasks can be rejected (this one is ${task.status}). Use /close to shut down an open task instead.` };
+  }
+
+  await prisma.$transaction([
+    prisma.taskHistory.deleteMany({ where: { taskId: id } }),
+    prisma.task.delete({ where: { id } }),
+  ]);
+
+  return { message: `🗑️ Task #${id} "${task.title}" rejected and discarded.` };
+}
+
 export function registerApprove(bot) {
   bot.command('approve', async (ctx) => {
     const id = Number(ctx.message.text.split(' ')[1]);
@@ -80,6 +104,18 @@ export function registerApprove(bot) {
     if (result.error) return ctx.reply(result.error);
 
     const originalText = ctx.callbackQuery.message.text || '';
-    await ctx.editMessageText(`${originalText}\n\n${result.message}`).catch(() => ctx.reply(result.message));
+    await ctx
+      .editMessageText(`${originalText}\n\n${result.message}`, Markup.inlineKeyboard([]))
+      .catch(() => ctx.reply(result.message));
+  });
+
+  bot.action(/^task_reject:(\d+)$/, async (ctx) => {
+    const id = Number(ctx.match[1]);
+    const result = await rejectTask(ctx, id);
+
+    await ctx.answerCbQuery(result.error ? '❌' : '🗑️ Rejected');
+    if (result.error) return ctx.reply(result.error);
+
+    await ctx.editMessageText(result.message, Markup.inlineKeyboard([])).catch(() => ctx.reply(result.message));
   });
 }

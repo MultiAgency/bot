@@ -67,33 +67,39 @@ export const CATEGORIES = [
   ['✨ Other', 'other'],
 ];
 
-export function categoryKeyboard() {
+// prefix lets the same keyboard be reused for both the creation wizard
+// (newtask_category:<value>) and the edit flow (task_edit_category:<id>:<value>).
+export function categoryKeyboard(prefix = 'newtask_category') {
   return Markup.inlineKeyboard(
     [
-      ...CATEGORIES.map(([label, value]) => Markup.button.callback(label, `newtask_category:${value}`)),
-      Markup.button.callback('⏭ Skip', 'newtask_category:skip'),
+      ...CATEGORIES.map(([label, value]) => Markup.button.callback(label, `${prefix}:${value}`)),
+      Markup.button.callback('⏭ Skip', `${prefix}:skip`),
     ],
     { columns: 2 }
   );
 }
 
-export function skillsKeyboard(category, selected) {
+export function skillsKeyboard(
+  category,
+  selected,
+  { togglePrefix = 'newtask_skill', doneAction = 'newtask_skills_done' } = {}
+) {
   const skills = skillsForCategory(category);
   const buttons = skills.map((skill, i) => {
     const checked = selected.includes(skill);
-    return Markup.button.callback(`${checked ? '✅ ' : ''}${skill}`, `newtask_skill:${i}`);
+    return Markup.button.callback(`${checked ? '✅ ' : ''}${skill}`, `${togglePrefix}:${i}`);
   });
   return Markup.inlineKeyboard(
-    [...buttons, Markup.button.callback('✅ Done', 'newtask_skills_done')],
+    [...buttons, Markup.button.callback('✅ Done', doneAction)],
     { columns: 2 }
   );
 }
 
-// Full task summary + an Approve button, shown right after creation so an
-// admin doesn't need to look up the id and type /approve <id> separately.
-export function taskCreatedMessage(task) {
-  const text = [
-    `📝 Task #${task.id} created (Draft)`,
+// Full task summary shown right after creation and after each edit, so an
+// admin can see everything without looking anything up separately.
+export function taskSummaryText(task, { heading = `📝 Task #${task.id} (Draft)`, footer } = {}) {
+  return [
+    heading,
     '',
     `📌 Title: ${task.title}`,
     `📄 Description: ${task.description}`,
@@ -102,11 +108,25 @@ export function taskCreatedMessage(task) {
     `🏷️ Category: ${task.category || '(none)'}`,
     `🛠️ Skills: ${task.requiredSkills?.length ? task.requiredSkills.join(', ') : '(none)'}`,
     `👥 Max assignees: ${task.maxAssignees}`,
-    '',
-    '👇 Tap Approve to open it up for applicants.',
+    ...(footer ? ['', footer] : []),
   ].join('\n');
+}
 
-  const keyboard = Markup.inlineKeyboard([Markup.button.callback('✅ Approve', `task_approve:${task.id}`)]);
+// Task summary + Approve/Reject/Edit buttons, shown after creation (see
+// approve.js and taskEdit.js for what each button does).
+export function taskCreatedMessage(task) {
+  const text = taskSummaryText(task, {
+    heading: `📝 Task #${task.id} created (Draft)`,
+    footer: '👇 Approve to open it up, Reject to discard it, or Edit to fix something first.',
+  });
+
+  const keyboard = Markup.inlineKeyboard([
+    [
+      Markup.button.callback('✅ Approve', `task_approve:${task.id}`),
+      Markup.button.callback('❌ Reject', `task_reject:${task.id}`),
+    ],
+    [Markup.button.callback('✏️ Edit', `task_edit:${task.id}`)],
+  ]);
   return { text, keyboard };
 }
 

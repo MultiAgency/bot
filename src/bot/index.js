@@ -4,6 +4,7 @@ import { registerOnboard } from './commands/onboard.js';
 import { registerNewTask } from './commands/newTask.js';
 import { registerDraftTask } from './commands/draftTask.js';
 import { registerApprove } from './commands/approve.js';
+import { registerTaskEdit } from './commands/taskEdit.js';
 import { registerCloseTask } from './commands/closeTask.js';
 import { registerTasks } from './commands/tasks.js';
 import { registerMyTasks } from './commands/myTasks.js';
@@ -33,6 +34,7 @@ export function createBot(token) {
   registerNewTask(bot);
   registerDraftTask(bot);
   registerApprove(bot);
+  registerTaskEdit(bot);
   registerCloseTask(bot);
   registerTasks(bot);
   registerMyTasks(bot);

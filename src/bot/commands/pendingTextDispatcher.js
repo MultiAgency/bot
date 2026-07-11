@@ -1,6 +1,7 @@
 import { peekPending, clearPending } from '../pendingActions.js';
 import { validateAssignmentForSubmission, submitTextOrLink, replyForTextSubmission } from './submitCore.js';
 import { handleNewTaskWizardStep } from './newTaskCore.js';
+import { handleTaskEditFieldAnswer } from './taskEdit.js';
 
 // Dispatches a plain (non-command) text message to whichever pending
 // conversational flow the sender is in: two-step submission or the
@@ -31,6 +32,10 @@ export function registerPendingTextDispatcher(bot) {
 
     if (entry.type === 'newtask_wizard') {
       return handleNewTaskWizardStep(ctx, entry);
+    }
+
+    if (entry.type === 'newtask_edit') {
+      return handleTaskEditFieldAnswer(ctx, entry);
     }
 
     // onboard_wizard is entirely button-driven (see onboard.js) - a stray
