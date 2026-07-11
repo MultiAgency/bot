@@ -13,6 +13,8 @@ const DECISION_TO_SUBMISSION_STATUS = {
   revise: SUBMISSION_STATUS.NEEDS_REVISION,
 };
 
+const DECISION_EMOJI = { approve: '✅', reject: '❌', revise: '🔄' };
+
 // Submission approve/reject cascade to the Application per the spec:
 // approve -> Completed (terminal; slot stays consumed), reject -> Rejected
 // (terminal; slot freed). Revise leaves the Application Assigned so the
@@ -30,24 +32,24 @@ export function registerReview(bot) {
     const note = parts.slice(3).join(' ').trim() || null;
 
     if (!id || !DECISION_TO_SUBMISSION_STATUS[decision]) {
-      return ctx.reply('Usage: /review <application_id> approve|reject|revise [note]');
+      return ctx.reply('ℹ️ Usage: /review <application_id> approve|reject|revise [note]');
     }
 
     const application = await prisma.application.findUnique({
       where: { id },
       include: { task: true, contributor: true },
     });
-    if (!application) return ctx.reply(`Application #${id} not found.`);
+    if (!application) return ctx.reply(`❌ Application #${id} not found.`);
 
     if (!(await canManageTask(ctx, application.task))) {
-      return ctx.reply('Only admins of this task\'s room (or global admins) can review it.');
+      return ctx.reply('🚫 Only admins of this task\'s room (or global admins) can review it.');
     }
 
     const submission = await prisma.submission.findFirst({
       where: { applicationId: id },
       orderBy: { version: 'desc' },
     });
-    if (!submission) return ctx.reply(`Application #${id} has no submission to review yet.`);
+    if (!submission) return ctx.reply(`📭 Application #${id} has no submission to review yet.`);
 
     const toSubmissionStatus = DECISION_TO_SUBMISSION_STATUS[decision];
     try {
@@ -55,7 +57,7 @@ export function registerReview(bot) {
       const toApplicationStatus = DECISION_TO_APPLICATION_STATUS[decision];
       if (toApplicationStatus) assertApplicationTransition(application.status, toApplicationStatus);
     } catch (err) {
-      return ctx.reply(`Cannot review: ${err.message}`);
+      return ctx.reply(`❌ Cannot review: ${err.message}`);
     }
 
     // Atomic guard: if another admin reviewed this submission first (even
@@ -66,7 +68,7 @@ export function registerReview(bot) {
       data: { status: toSubmissionStatus, reviewerNote: note },
     });
     if (result.count === 0) {
-      return ctx.reply(`Submission v${submission.version} was already reviewed by someone else.`);
+      return ctx.reply(`⚠️ Submission v${submission.version} was already reviewed by someone else.`);
     }
 
     await prisma.submissionHistory.create({
@@ -109,14 +111,17 @@ export function registerReview(bot) {
     }
 
     const messages = {
-      approve: `Task #${application.taskId} "${application.task.title}" - your submission was approved. Thank you!`,
-      reject: `Task #${application.taskId} "${application.task.title}" - your submission was rejected.${note ? ` Reason: ${note}` : ''}`,
-      revise: `Task #${application.taskId} "${application.task.title}" needs revision.${note ? ` Note: ${note}` : ''} Use /submit ${application.taskId} <new content> to resubmit.`,
+      approve: `🎉 Task #${application.taskId} "${application.task.title}" — your submission was approved. Thank you!`,
+      reject: `❌ Task #${application.taskId} "${application.task.title}" — your submission was rejected.${note ? ` Reason: ${note}` : ''}`,
+      revise: `🔄 Task #${application.taskId} "${application.task.title}" needs revision.${note ? ` Note: ${note}` : ''}\n📤 Use /submit ${application.taskId} <new content> to resubmit.`,
     };
     await ctx.telegram
       .sendMessage(application.contributor.telegramUserId.toString(), messages[decision])
       .catch(() => {});
 
-    await ctx.reply(`Reviewed submission v${submission.version} for application #${id} -> ${toSubmissionStatus}${toApplicationStatus ? ` (application -> ${toApplicationStatus})` : ''}.`);
+    const emoji = DECISION_EMOJI[decision] || '📌';
+    await ctx.reply(
+      `${emoji} Reviewed submission v${submission.version} for application #${id} → ${toSubmissionStatus}${toApplicationStatus ? ` (application → ${toApplicationStatus})` : ''}.`
+    );
   });
 }

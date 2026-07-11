@@ -14,7 +14,7 @@ export function registerMentionReply(bot) {
     if (!username || !ctx.message.text.includes(`@${username}`)) return next();
 
     await ctx.reply(
-      "Hey, I'm here! Use /help to see what I can do, /tasks to see open tasks, or /newtask to create one."
+      "👋 Hey, I'm here! Use /help to see what I can do, /tasks to see open tasks, or /newtask to create one."
     );
 
     return next();

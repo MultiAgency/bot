@@ -9,8 +9,8 @@ export function registerSubmit(bot) {
 
     if (!id) {
       return ctx.reply(
-        'Usage: /submit <task_id> <content or link>\n' +
-          'Or just "/submit <task_id>" and then send your text, link, video, photo, or file next.'
+        'ℹ️ Usage: /submit <task_id> <content or link>\n' +
+          '💡 Or just "/submit <task_id>" and then send your text, link, video, photo, or file next.'
       );
     }
 
@@ -20,7 +20,7 @@ export function registerSubmit(bot) {
     if (!content) {
       setPending(ctx.from.id, 'submission', { taskId: id });
       return ctx.reply(
-        `Ready for your submission for task #${id}. Send text, a link, video, photo, or file within 5 minutes.`
+        `📤 Ready for your submission for task #${id}. Send text, a link, video, photo, or file within 5 minutes.`
       );
     }
 

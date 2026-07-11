@@ -37,17 +37,17 @@ export async function createDraftTask(
 }
 
 export function taskCreatedReply(task) {
-  return `Created task #${task.id} (Draft, max ${task.maxAssignees} assignee${task.maxAssignees === 1 ? '' : 's'}): "${task.title}"\nUse /approve ${task.id} to open it up.`;
+  return `📝 Created task #${task.id} (Draft, max ${task.maxAssignees} assignee${task.maxAssignees === 1 ? '' : 's'}): "${task.title}"\n✅ Use /approve ${task.id} to open it up.`;
 }
 
 const WIZARD_STEP_ORDER = ['title', 'description', 'reward', 'requiredOutput', 'category', 'skills', 'maxAssignees'];
 const WIZARD_PROMPTS = {
-  description: 'Description?',
-  reward: 'Reward? (type "skip" to leave blank)',
-  requiredOutput: 'Required output format? (type "skip" to leave blank)',
-  category: 'Category? (type "skip" to leave blank)',
-  skills: 'Skills, comma-separated? (type "skip" to leave blank)',
-  maxAssignees: 'How many contributors can be assigned at once? (type "skip" for 1)',
+  description: '📄 Description?',
+  reward: '💰 Reward? (type "skip" to leave blank)',
+  requiredOutput: '📦 Required output format? (type "skip" to leave blank)',
+  category: '🏷️ Category? (type "skip" to leave blank)',
+  skills: '🛠️ Skills, comma-separated? (type "skip" to leave blank)',
+  maxAssignees: '👥 How many contributors can be assigned at once? (type "skip" for 1)',
 };
 
 function nextWizardStep(step) {
@@ -63,7 +63,7 @@ export async function handleNewTaskWizardStep(ctx, entry) {
   const isRequiredField = step === 'title' || step === 'description';
 
   if (isRequiredField && !text) {
-    return ctx.reply(`${step === 'title' ? 'Title' : 'Description'} can't be empty. Try again:`);
+    return ctx.reply(`⚠️ ${step === 'title' ? 'Title' : 'Description'} can't be empty. Try again:`);
   }
 
   const value = isRequiredField ? text : text.toLowerCase() === 'skip' ? null : text;

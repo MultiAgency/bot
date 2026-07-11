@@ -1,4 +1,5 @@
 import { prisma } from '../../db.js';
+import { APPLICATION_STATUS_EMOJI, SUBMISSION_STATUS_EMOJI } from '../emoji.js';
 
 export function registerMyTasks(bot) {
   bot.command('mytasks', async (ctx) => {
@@ -7,7 +8,7 @@ export function registerMyTasks(bot) {
     });
 
     if (!contributor) {
-      return ctx.reply('You have no applications yet. Use /tasks to see what\'s open.');
+      return ctx.reply("📭 You have no applications yet. Use /tasks to see what's open.");
     }
 
     const applications = await prisma.application.findMany({
@@ -18,15 +19,17 @@ export function registerMyTasks(bot) {
     });
 
     if (applications.length === 0) {
-      return ctx.reply('You have no applications yet. Use /tasks to see what\'s open.');
+      return ctx.reply("📭 You have no applications yet. Use /tasks to see what's open.");
     }
 
     const lines = applications.map((a) => {
       const latest = a.submissions[0];
-      const submissionInfo = latest ? `, latest submission v${latest.version}: ${latest.status}` : '';
-      return `#${a.taskId} "${a.task.title}" - application ${a.status}${submissionInfo}`;
+      const submissionInfo = latest
+        ? `\n${SUBMISSION_STATUS_EMOJI[latest.status] || '📄'} Latest submission v${latest.version}: ${latest.status}`
+        : '';
+      return `📋 #${a.taskId} "${a.task.title}"\n${APPLICATION_STATUS_EMOJI[a.status] || '📌'} ${a.status}${submissionInfo}`;
     });
 
-    await ctx.reply(['Your applications:', ...lines].join('\n'));
+    await ctx.reply(`🗂 Your applications:\n\n${lines.join('\n\n')}`);
   });
 }

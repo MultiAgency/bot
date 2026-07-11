@@ -22,10 +22,10 @@ export function registerSignalChatAdmin(bot) {
 
       await notifyAdmins(
         ctx,
-        `Bot was added to "${chat.title || chat.id}" (chat id: ${chat.id}) by ${actor.username ? '@' + actor.username : actor.id}, who is now a room admin there.\n` +
-          'To auto-draft tasks from messages in this group, a room admin should open that group and run /enablesignals. ' +
-          'Make sure Telegram bot Privacy Mode is disabled via @BotFather first (see DEPLOY.md), or the bot will only see commands.\n' +
-          'Use /addroomadmin (as a reply to a user\'s message) to add more room admins.'
+        `🎉 Bot was added to "${chat.title || chat.id}" (chat id: ${chat.id}) by ${actor.username ? '@' + actor.username : actor.id}, who is now a room admin there.\n` +
+          '📡 To auto-draft tasks from messages in this group, a room admin should open that group and run /enablesignals. ' +
+          '⚠️ Make sure Telegram bot Privacy Mode is disabled via @BotFather first (see DEPLOY.md), or the bot will only see commands.\n' +
+          '👑 Use /addroomadmin (as a reply to a user\'s message) to add more room admins.'
       );
     } else if (justLeft) {
       await setSignalsEnabled(chat.id, false).catch(() => {});
@@ -34,37 +34,37 @@ export function registerSignalChatAdmin(bot) {
 
   bot.command('enablesignals', async (ctx) => {
     if (ctx.chat.type === 'private') {
-      return ctx.reply('Run this inside the group you want monitored, not in a DM.');
+      return ctx.reply('ℹ️ Run this inside the group you want monitored, not in a DM.');
     }
 
     const room = await getOrCreateRoom(ctx.chat.id, ctx.chat.title);
     if (!(await canManageRoom(ctx, room.id))) {
-      return ctx.reply('Only admins of this room (or global admins) can enable signal detection.');
+      return ctx.reply('🚫 Only admins of this room (or global admins) can enable signal detection.');
     }
 
     await setSignalsEnabled(ctx.chat.id, true);
     await ctx.reply(
-      'Signal detection enabled for this group. Messages here will now be scored for auto-drafting tasks ' +
+      '📡✅ Signal detection enabled for this group. Messages here will now be scored for auto-drafting tasks ' +
         '(subject to rate limits). Use /disablesignals to turn it off.'
     );
   });
 
   bot.command('disablesignals', async (ctx) => {
     if (ctx.chat.type === 'private') {
-      return ctx.reply('Run this inside the group, not in a DM.');
+      return ctx.reply('ℹ️ Run this inside the group, not in a DM.');
     }
 
     const room = await getOrCreateRoom(ctx.chat.id, ctx.chat.title);
     if (!(await canManageRoom(ctx, room.id))) {
-      return ctx.reply('Only admins of this room (or global admins) can disable signal detection.');
+      return ctx.reply('🚫 Only admins of this room (or global admins) can disable signal detection.');
     }
 
     await setSignalsEnabled(ctx.chat.id, false);
-    await ctx.reply('Signal detection disabled for this group.');
+    await ctx.reply('📡🚫 Signal detection disabled for this group.');
   });
 
   bot.command('signalstatus', async (ctx) => {
     const enabled = await isSignalsEnabled(ctx.chat.id);
-    await ctx.reply(`Signal detection is ${enabled ? 'ON' : 'OFF'} for this chat.`);
+    await ctx.reply(`📡 Signal detection is ${enabled ? 'ON ✅' : 'OFF 🚫'} for this chat.`);
   });
 }

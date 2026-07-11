@@ -2,6 +2,7 @@ import { Markup } from 'telegraf';
 import { prisma } from '../../db.js';
 import { setPending, peekPending, updatePending, clearPending } from '../pendingActions.js';
 import { evaluateCandidate } from '../../candidateEvaluation.js';
+import { TIER_EMOJI } from '../emoji.js';
 
 // Entirely button-driven (no free-text steps): in a group, a plain text
 // reply from the user only reaches the bot if Privacy Mode is disabled AND
@@ -11,23 +12,23 @@ import { evaluateCandidate } from '../../candidateEvaluation.js';
 // makes it work reliably in groups without depending on that setup step.
 
 const JOB_ROLES = [
-  ['Developer', 'DEVELOPER'],
-  ['Designer', 'DESIGNER'],
-  ['Writer', 'WRITER'],
-  ['Marketing', 'MARKETING'],
-  ['Community', 'COMMUNITY'],
-  ['Research', 'RESEARCH'],
-  ['Video', 'VIDEO'],
-  ['Other', 'OTHER'],
+  ['👨‍💻 Developer', 'DEVELOPER'],
+  ['🎨 Designer', 'DESIGNER'],
+  ['✍️ Writer', 'WRITER'],
+  ['📣 Marketing', 'MARKETING'],
+  ['🌐 Community', 'COMMUNITY'],
+  ['🔬 Research', 'RESEARCH'],
+  ['🎬 Video', 'VIDEO'],
+  ['✨ Other', 'OTHER'],
 ];
 
 const INCOME_OPTIONS = [
-  ['< $100/mo', 'UNDER_100'],
-  ['$100-500/mo', '100_500'],
-  ['$500-1000/mo', '500_1000'],
-  ['$1000-3000/mo', '1000_3000'],
-  ['$3000+/mo', 'OVER_3000'],
-  ['Per-task / negotiable', 'NEGOTIABLE'],
+  ['💵 < $100/mo', 'UNDER_100'],
+  ['💵 $100-500/mo', '100_500'],
+  ['💰 $500-1000/mo', '500_1000'],
+  ['💰 $1000-3000/mo', '1000_3000'],
+  ['💎 $3000+/mo', 'OVER_3000'],
+  ['🤝 Per-task / negotiable', 'NEGOTIABLE'],
 ];
 
 const INCOME_LABELS = Object.fromEntries(INCOME_OPTIONS.map(([label, value]) => [value, label]));
@@ -50,7 +51,7 @@ function skillsKeyboard(role, selected) {
     return Markup.button.callback(`${checked ? '✅ ' : ''}${skill}`, `onboard_skill:${i}`);
   });
   return Markup.inlineKeyboard(
-    [...buttons, Markup.button.callback('Done ✅', 'onboard_skills_done')],
+    [...buttons, Markup.button.callback('✅ Done', 'onboard_skills_done')],
     { columns: 2 }
   );
 }
@@ -82,14 +83,17 @@ async function finalizeOnboarding(ctx, fields) {
     data: { isRegistered: true, telegramScore, socialTrustScore, eligibilityTier, lastEvaluatedAt: new Date() },
   });
 
+  const tierEmoji = TIER_EMOJI[eligibilityTier] || '🏷';
+
   await ctx.reply(
     [
-      `Onboarded as ${fields.jobRole}. Initial trust tier: ${eligibilityTier}.`,
-      fields.desiredIncomeLabel ? `Desired income: ${fields.desiredIncomeLabel}` : null,
-      fields.selectedSkills?.length ? `Skills: ${fields.selectedSkills.join(', ')}` : 'Skills: (none selected)',
-      `Telegram score: ${telegramScore.toFixed(2)}`,
+      `🎉 You're onboarded as ${fields.jobRole}!`,
+      `${tierEmoji} Trust tier: ${eligibilityTier}`,
+      fields.desiredIncomeLabel ? `💰 Desired income: ${fields.desiredIncomeLabel}` : null,
+      `⭐ Skills: ${fields.selectedSkills?.length ? fields.selectedSkills.join(', ') : '(none selected)'}`,
+      `📊 Telegram score: ${telegramScore.toFixed(2)}`,
       '',
-      "You're all set. Use /tasks to see what's open.",
+      "✅ You're all set — use /tasks to see what's open.",
     ]
       .filter(Boolean)
       .join('\n')
@@ -100,7 +104,7 @@ export function registerOnboard(bot) {
   bot.command('onboard', async (ctx) => {
     setPending(ctx.from.id, 'onboard_wizard', { step: 'jobRole', fields: {} });
     await ctx.reply(
-      "Let's get you onboarded. What's your primary role?",
+      "🚀 Let's get you onboarded! What's your primary role?",
       Markup.inlineKeyboard(
         JOB_ROLES.map(([label, value]) => Markup.button.callback(label, `onboard_role:${value}`)),
         { columns: 2 }
@@ -111,16 +115,16 @@ export function registerOnboard(bot) {
   bot.action(/^onboard_role:(.+)$/, async (ctx) => {
     const entry = peekPending(ctx.from.id);
     if (!entry || entry.type !== 'onboard_wizard' || entry.data.step !== 'jobRole') {
-      return ctx.answerCbQuery('This selection has expired - run /onboard again.');
+      return ctx.answerCbQuery('⚠️ This selection has expired - run /onboard again.');
     }
 
     const role = ctx.match[1];
     updatePending(ctx.from.id, { step: 'income', fields: { ...entry.data.fields, jobRole: role } });
 
     await ctx.answerCbQuery();
-    await ctx.editMessageText(`Role: ${role}`).catch(() => {});
+    await ctx.editMessageText(`✅ Role: ${role}`).catch(() => {});
     await ctx.reply(
-      'What income/rate are you looking for?',
+      '💰 What income/rate are you looking for?',
       Markup.inlineKeyboard(
         INCOME_OPTIONS.map(([label, value]) => Markup.button.callback(label, `onboard_income:${value}`)),
         { columns: 2 }
@@ -131,7 +135,7 @@ export function registerOnboard(bot) {
   bot.action(/^onboard_income:(.+)$/, async (ctx) => {
     const entry = peekPending(ctx.from.id);
     if (!entry || entry.type !== 'onboard_wizard' || entry.data.step !== 'income') {
-      return ctx.answerCbQuery('This selection has expired - run /onboard again.');
+      return ctx.answerCbQuery('⚠️ This selection has expired - run /onboard again.');
     }
 
     const value = ctx.match[1];
@@ -140,9 +144,9 @@ export function registerOnboard(bot) {
     updatePending(ctx.from.id, { step: 'skills', fields: { ...fields, selectedSkills: [] } });
 
     await ctx.answerCbQuery();
-    await ctx.editMessageText(`Income: ${desiredIncomeLabel}`).catch(() => {});
+    await ctx.editMessageText(`✅ Income: ${desiredIncomeLabel}`).catch(() => {});
     await ctx.reply(
-      `Pick your skills (${fields.jobRole}), tap each one, then Done:`,
+      `⭐ Pick your skills (${fields.jobRole}) — tap each one, then Done:`,
       skillsKeyboard(fields.jobRole, [])
     );
   });
@@ -150,7 +154,7 @@ export function registerOnboard(bot) {
   bot.action(/^onboard_skill:(\d+)$/, async (ctx) => {
     const entry = peekPending(ctx.from.id);
     if (!entry || entry.type !== 'onboard_wizard' || entry.data.step !== 'skills') {
-      return ctx.answerCbQuery('This selection has expired - run /onboard again.');
+      return ctx.answerCbQuery('⚠️ This selection has expired - run /onboard again.');
     }
 
     const { jobRole, selectedSkills = [] } = entry.data.fields;
@@ -170,13 +174,13 @@ export function registerOnboard(bot) {
   bot.action('onboard_skills_done', async (ctx) => {
     const entry = peekPending(ctx.from.id);
     if (!entry || entry.type !== 'onboard_wizard' || entry.data.step !== 'skills') {
-      return ctx.answerCbQuery('This selection has expired - run /onboard again.');
+      return ctx.answerCbQuery('⚠️ This selection has expired - run /onboard again.');
     }
 
     clearPending(ctx.from.id);
     await ctx.answerCbQuery();
     await ctx.editMessageText(
-      `Skills: ${entry.data.fields.selectedSkills?.length ? entry.data.fields.selectedSkills.join(', ') : '(none selected)'}`
+      `⭐ Skills: ${entry.data.fields.selectedSkills?.length ? entry.data.fields.selectedSkills.join(', ') : '(none selected)'}`
     ).catch(() => {});
 
     await finalizeOnboarding(ctx, entry.data.fields);

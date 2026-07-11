@@ -11,7 +11,7 @@ export function registerPendingTextDispatcher(bot) {
   bot.command('cancel', async (ctx) => {
     const had = peekPending(ctx.from.id);
     clearPending(ctx.from.id);
-    await ctx.reply(had ? 'Cancelled.' : 'Nothing to cancel.');
+    await ctx.reply(had ? '✅ Cancelled.' : 'ℹ️ Nothing to cancel.');
   });
 
   bot.on('text', async (ctx, next) => {

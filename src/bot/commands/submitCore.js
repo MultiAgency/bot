@@ -11,14 +11,14 @@ export async function validateAssignmentForSubmission(ctx, taskId) {
   const contributor = await prisma.contributor.findUnique({
     where: { telegramUserId: BigInt(ctx.from.id) },
   });
-  if (!contributor) return { error: "You don't have an assignment for that task." };
+  if (!contributor) return { error: "🚫 You don't have an assignment for that task." };
 
   const application = await prisma.application.findFirst({
     where: { taskId, contributorId: contributor.id, status: APPLICATION_STATUS.ASSIGNED },
     include: { task: true },
   });
   if (!application) {
-    return { error: `You don't have an active assignment for task #${taskId}.` };
+    return { error: `🚫 You don't have an active assignment for task #${taskId}.` };
   }
 
   return { application };
@@ -38,7 +38,7 @@ async function runAiPreReview(ctx, submission, task) {
     const recipients = await getTaskManagerIds(task);
     await Promise.allSettled(
       recipients.map((id) =>
-        ctx.telegram.sendMessage(id, `AI pre-review for task #${task.id} (submission #${submission.id}):\n${note}`)
+        ctx.telegram.sendMessage(id, `🤖 AI pre-review for task #${task.id} (submission #${submission.id}):\n${note}`)
       )
     );
   } catch (err) {
@@ -70,8 +70,8 @@ export async function finalizeSubmission(ctx, application, data) {
   await notifyTaskManagers(
     ctx,
     application.task,
-    `Task #${application.taskId} "${application.task.title}" got submission v${version} (application #${application.id}) from ${ctx.from.username ? '@' + ctx.from.username : ctx.from.id}.\n` +
-      `Use /review ${application.id} approve|reject|revise [note] to handle it.`
+    `📤 Task #${application.taskId} "${application.task.title}" got submission v${version} (application #${application.id}) from ${ctx.from.username ? '@' + ctx.from.username : ctx.from.id}.\n` +
+      `👀 Use /review ${application.id} approve|reject|revise [note] to handle it.`
   );
 
   runAiPreReview(ctx, submission, application.task); // not awaited - fire and forget, see comment above
@@ -104,9 +104,9 @@ export async function submitTextOrLink(ctx, application, content) {
 export function replyForTextSubmission(ctx, id, submissionFileMetadata) {
   if (submissionFileMetadata?.conversionFailed) {
     return ctx.reply(
-      `Submitted, but the link couldn't be auto-converted (${submissionFileMetadata.error}). ` +
+      `⚠️ Submitted, but the link couldn't be auto-converted (${submissionFileMetadata.error}). ` +
         'The reviewer will need to open it manually.'
     );
   }
-  return ctx.reply(`Submitted your result for task #${id}. Waiting for reviewer approval.`);
+  return ctx.reply(`✅ Submitted your result for task #${id}. Waiting for reviewer approval.`);
 }

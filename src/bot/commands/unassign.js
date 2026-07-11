@@ -7,22 +7,22 @@ export function registerUnassign(bot) {
     const parts = ctx.message.text.split(' ');
     const id = Number(parts[1]);
     const reason = parts.slice(2).join(' ').trim();
-    if (!id || !reason) return ctx.reply('Usage: /unassign <application_id> <reason>');
+    if (!id || !reason) return ctx.reply('ℹ️ Usage: /unassign <application_id> <reason>');
 
     const application = await prisma.application.findUnique({
       where: { id },
       include: { task: true, contributor: true },
     });
-    if (!application) return ctx.reply(`Application #${id} not found.`);
+    if (!application) return ctx.reply(`❌ Application #${id} not found.`);
 
     if (!(await canManageTask(ctx, application.task))) {
-      return ctx.reply('Only admins of this task\'s room (or global admins) can unassign contributors.');
+      return ctx.reply('🚫 Only admins of this task\'s room (or global admins) can unassign contributors.');
     }
 
     try {
       assertApplicationTransition(application.status, APPLICATION_STATUS.APPLIED);
     } catch (err) {
-      return ctx.reply(`Cannot unassign: ${err.message}`);
+      return ctx.reply(`❌ Cannot unassign: ${err.message}`);
     }
 
     const result = await prisma.application.updateMany({
@@ -30,7 +30,7 @@ export function registerUnassign(bot) {
       data: { status: APPLICATION_STATUS.APPLIED, unassignReason: reason },
     });
     if (result.count === 0) {
-      return ctx.reply('That application was already handled.');
+      return ctx.reply('⚠️ That application was already handled.');
     }
 
     await prisma.applicationHistory.create({
@@ -43,12 +43,12 @@ export function registerUnassign(bot) {
       },
     });
 
-    await ctx.reply(`Unassigned application #${id} from task #${application.taskId}. It's back in the applicant pool.`);
+    await ctx.reply(`🔄 Unassigned application #${id} from task #${application.taskId}. It's back in the applicant pool.`);
 
     await ctx.telegram
       .sendMessage(
         application.contributor.telegramUserId.toString(),
-        `You've been unassigned from task #${application.taskId} "${application.task.title}". Reason: ${reason}`
+        `🔄 You've been unassigned from task #${application.taskId} "${application.task.title}".\nReason: ${reason}`
       )
       .catch(() => {});
   });

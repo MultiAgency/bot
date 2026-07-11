@@ -11,14 +11,18 @@ export function registerTasks(bot) {
     });
 
     if (openTasks.length === 0) {
-      return ctx.reply('No open tasks right now.');
+      return ctx.reply('📭 No open tasks right now.');
     }
 
     const lines = openTasks.map((t) => {
       const assignedCount = t.applications.filter((a) => a.status === APPLICATION_STATUS.ASSIGNED).length;
-      return `#${t.id} - ${t.title}${t.reward ? ` (${t.reward})` : ''} (${assignedCount}/${t.maxAssignees} assigned)\nUse /apply ${t.id} to apply.`;
+      return (
+        `📋 #${t.id} — ${t.title}${t.reward ? ` (💰 ${t.reward})` : ''}\n` +
+        `👥 ${assignedCount}/${t.maxAssignees} assigned\n` +
+        `🙋 Use /apply ${t.id} to apply.`
+      );
     });
 
-    await ctx.reply(lines.join('\n\n'));
+    await ctx.reply(`📢 Open tasks:\n\n${lines.join('\n\n')}`);
   });
 }

@@ -9,7 +9,7 @@ export function registerDrafts(bot) {
     const roomIds = global ? null : await listRoomIdsForAdmin(ctx.from.id);
 
     if (!global && roomIds.length === 0) {
-      return ctx.reply('Only admins can view pending drafts.');
+      return ctx.reply('🚫 Only admins can view pending drafts.');
     }
 
     const where = { status: TASK_STATUS.DRAFT, ...(global ? {} : { roomId: { in: roomIds } }) };
@@ -21,15 +21,15 @@ export function registerDrafts(bot) {
     });
 
     if (draftTasks.length === 0) {
-      return ctx.reply('No pending drafts.');
+      return ctx.reply('📭 No pending drafts.');
     }
 
     const lines = draftTasks.map((t) => {
-      const source = t.signal ? `auto-drafted from signal (score-gated, reasoning: ${t.signal.summary})` : 'created manually';
+      const source = t.signal ? `🤖 auto-drafted from signal (score-gated, reasoning: ${t.signal.summary})` : '✍️ created manually';
       const room = t.room?.chatTitle ? ` in "${t.room.chatTitle}"` : '';
-      return `#${t.id} "${t.title}"${room}\n${source}\nUse /approve ${t.id} to review.`;
+      return `📝 #${t.id} "${t.title}"${room}\n${source}\n✅ Use /approve ${t.id} to review.`;
     });
 
-    await ctx.reply(lines.join('\n\n'));
+    await ctx.reply(`📥 Pending drafts:\n\n${lines.join('\n\n')}`);
   });
 }

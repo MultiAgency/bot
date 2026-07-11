@@ -34,7 +34,7 @@ async function forwardToTaskManagers(ctx, task) {
   );
 }
 
-function registerMediaSubmit(bot, updateType, { submissionType, fileId, submissionFileMetadata, label }) {
+function registerMediaSubmit(bot, updateType, { submissionType, fileId, submissionFileMetadata, label, emoji }) {
   bot.on(updateType, async (ctx) => {
     const parsed = resolveSubmission(ctx);
     if (!parsed) return; // not a submission attempt - ignore silently
@@ -50,7 +50,7 @@ function registerMediaSubmit(bot, updateType, { submissionType, fileId, submissi
     });
 
     await forwardToTaskManagers(ctx, application.task);
-    await ctx.reply(`Submitted your ${label} for task #${parsed.id}. Waiting for reviewer approval.`);
+    await ctx.reply(`✅ ${emoji} Submitted your ${label} for task #${parsed.id}. Waiting for reviewer approval.`);
   });
 }
 
@@ -59,6 +59,7 @@ export function registerSubmitMedia(bot) {
     submissionType: 'FILE',
     fileId: (ctx) => ctx.message.video.file_id,
     label: 'video',
+    emoji: '🎥',
   });
 
   registerMediaSubmit(bot, 'document', {
@@ -69,11 +70,13 @@ export function registerSubmitMedia(bot) {
       fileName: ctx.message.document.file_name || null,
     }),
     label: 'file',
+    emoji: '📄',
   });
 
   registerMediaSubmit(bot, 'photo', {
     submissionType: 'SCREENSHOT',
     fileId: (ctx) => ctx.message.photo[ctx.message.photo.length - 1].file_id,
     label: 'screenshot',
+    emoji: '📸',
   });
 }

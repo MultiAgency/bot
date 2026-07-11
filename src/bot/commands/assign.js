@@ -5,22 +5,22 @@ import { APPLICATION_STATUS, assertApplicationTransition } from '../../workflow.
 export function registerAssign(bot) {
   bot.command('assign', async (ctx) => {
     const id = Number(ctx.message.text.split(' ')[1]);
-    if (!id) return ctx.reply('Usage: /assign <application_id>');
+    if (!id) return ctx.reply('ℹ️ Usage: /assign <application_id>');
 
     const application = await prisma.application.findUnique({
       where: { id },
       include: { task: true, contributor: true },
     });
-    if (!application) return ctx.reply(`Application #${id} not found.`);
+    if (!application) return ctx.reply(`❌ Application #${id} not found.`);
 
     if (!(await canManageTask(ctx, application.task))) {
-      return ctx.reply('Only admins of this task\'s room (or global admins) can assign applicants.');
+      return ctx.reply('🚫 Only admins of this task\'s room (or global admins) can assign applicants.');
     }
 
     try {
       assertApplicationTransition(application.status, APPLICATION_STATUS.ASSIGNED);
     } catch (err) {
-      return ctx.reply(`Cannot assign: ${err.message}`);
+      return ctx.reply(`❌ Cannot assign: ${err.message}`);
     }
 
     const assignedCount = await prisma.application.count({
@@ -28,7 +28,7 @@ export function registerAssign(bot) {
     });
     if (assignedCount >= application.task.maxAssignees) {
       return ctx.reply(
-        `Task #${application.taskId} already has ${assignedCount}/${application.task.maxAssignees} assigned. Unassign someone first or this applicant can't be added.`
+        `⚠️ Task #${application.taskId} already has ${assignedCount}/${application.task.maxAssignees} assigned. Unassign someone first or this applicant can't be added.`
       );
     }
 
@@ -37,7 +37,7 @@ export function registerAssign(bot) {
       data: { status: APPLICATION_STATUS.ASSIGNED },
     });
     if (result.count === 0) {
-      return ctx.reply('That application was already handled.');
+      return ctx.reply('⚠️ That application was already handled.');
     }
 
     await prisma.applicationHistory.create({
@@ -49,12 +49,14 @@ export function registerAssign(bot) {
       },
     });
 
-    await ctx.reply(`Assigned application #${id} to task #${application.taskId} (${assignedCount + 1}/${application.task.maxAssignees}).`);
+    await ctx.reply(
+      `✍️ Assigned application #${id} to task #${application.taskId} (👥 ${assignedCount + 1}/${application.task.maxAssignees}).`
+    );
 
     await ctx.telegram
       .sendMessage(
         application.contributor.telegramUserId.toString(),
-        `You've been assigned to task #${application.taskId} "${application.task.title}". Use /submit ${application.taskId} <content or link> (or send a video/photo/file) when ready.`
+        `🎉 You've been assigned to task #${application.taskId} "${application.task.title}".\n📤 Use /submit ${application.taskId} <content or link> (or send a video/photo/file) when ready.`
       )
       .catch(() => {});
   });

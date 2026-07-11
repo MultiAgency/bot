@@ -7,8 +7,8 @@ export function registerNewTask(bot) {
     if (!allowed) {
       return ctx.reply(
         isPrivate
-          ? 'Only global admins can create tasks via DM.'
-          : 'Only admins of this room (or global admins) can create tasks here.'
+          ? '🚫 Only global admins can create tasks via DM.'
+          : '🚫 Only admins of this room (or global admins) can create tasks here.'
       );
     }
 
@@ -16,7 +16,7 @@ export function registerNewTask(bot) {
 
     if (!raw) {
       setPending(ctx.from.id, 'newtask_wizard', { step: 'title', roomId: room?.id ?? null, fields: {} });
-      return ctx.reply("Starting a new task draft. What's the title? (/cancel to stop)");
+      return ctx.reply("📝 Starting a new task draft. What's the title? (/cancel to stop)");
     }
 
     const [title, description, reward, requiredOutput, category, skillsRaw, maxAssigneesRaw] = raw
@@ -25,8 +25,8 @@ export function registerNewTask(bot) {
 
     if (!title || !description) {
       return ctx.reply(
-        'Usage: /newtask <title> | <description> | <reward> | <required output> | [category] | [skill1,skill2] | [max_assignees]\n' +
-          'Or just "/newtask" with no arguments to start a step-by-step wizard.'
+        'ℹ️ Usage: /newtask <title> | <description> | <reward> | <required output> | [category] | [skill1,skill2] | [max_assignees]\n' +
+          '💡 Or just "/newtask" with no arguments to start a step-by-step wizard.'
       );
     }
 
