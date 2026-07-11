@@ -1,3 +1,4 @@
+import { Markup } from 'telegraf';
 import { prisma } from '../../db.js';
 import { TASK_STATUS, APPLICATION_STATUS } from '../../workflow.js';
 import { taskSummaryText } from './newTaskCore.js';
@@ -15,14 +16,18 @@ export function registerTasks(bot) {
       return ctx.reply('📭 No open tasks right now.');
     }
 
-    const blocks = openTasks.map((t) => {
-      const assignedCount = t.applications.filter((a) => a.status === APPLICATION_STATUS.ASSIGNED).length;
-      return taskSummaryText(t, {
-        heading: `📋 Task #${t.id} (👥 ${assignedCount}/${t.maxAssignees} assigned)`,
-        footer: `🙋 Use /apply ${t.id} to apply.`,
-      });
-    });
+    await ctx.reply(`📢 ${openTasks.length} open task${openTasks.length === 1 ? '' : 's'}:`);
 
-    await ctx.reply(`📢 Open tasks:\n\n${blocks.join('\n\n〰️〰️〰️\n\n')}`);
+    for (const t of openTasks) {
+      const assignedCount = t.applications.filter((a) => a.status === APPLICATION_STATUS.ASSIGNED).length;
+      const text = taskSummaryText(t, {
+        heading: `📋 Task #${t.id} (👥 ${assignedCount}/${t.maxAssignees} assigned)`,
+      });
+      const keyboard = Markup.inlineKeyboard([
+        Markup.button.callback('🙋 Apply', `task_apply:${t.id}`),
+        Markup.button.callback('❌ Cancel', 'task_dismiss'),
+      ]);
+      await ctx.reply(text, keyboard);
+    }
   });
 }
