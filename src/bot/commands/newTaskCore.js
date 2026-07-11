@@ -36,6 +36,18 @@ export async function createDraftTask(
   });
 }
 
+// Group chats have Telegram Privacy Mode on by default, which silently
+// drops plain-text messages that aren't commands, mentions, or replies to
+// the bot. Forcing the client into "reply" mode against the specific user
+// (selective) makes their next message a reply to us, which Privacy Mode
+// always delivers - so free-text wizard steps stay reliable in groups too.
+export function forceReplyExtra(ctx) {
+  return {
+    reply_to_message_id: ctx.message.message_id,
+    reply_markup: { force_reply: true, selective: true },
+  };
+}
+
 export function taskCreatedReply(task) {
   return `📝 Created task #${task.id} (Draft, max ${task.maxAssignees} assignee${task.maxAssignees === 1 ? '' : 's'}): "${task.title}"\n✅ Use /approve ${task.id} to open it up.`;
 }
@@ -63,7 +75,7 @@ export async function handleNewTaskWizardStep(ctx, entry) {
   const isRequiredField = step === 'title' || step === 'description';
 
   if (isRequiredField && !text) {
-    return ctx.reply(`⚠️ ${step === 'title' ? 'Title' : 'Description'} can't be empty. Try again:`);
+    return ctx.reply(`⚠️ ${step === 'title' ? 'Title' : 'Description'} can't be empty. Try again:`, forceReplyExtra(ctx));
   }
 
   const value = isRequiredField ? text : text.toLowerCase() === 'skip' ? null : text;
@@ -81,5 +93,5 @@ export async function handleNewTaskWizardStep(ctx, entry) {
   }
 
   updatePending(ctx.from.id, { step: following, fields: updatedFields });
-  return ctx.reply(WIZARD_PROMPTS[following]);
+  return ctx.reply(WIZARD_PROMPTS[following], forceReplyExtra(ctx));
 }

@@ -1,4 +1,4 @@
-import { resolveCreationContext, createDraftTask, taskCreatedReply } from './newTaskCore.js';
+import { resolveCreationContext, createDraftTask, taskCreatedReply, forceReplyExtra } from './newTaskCore.js';
 import { setPending } from '../pendingActions.js';
 
 export function registerNewTask(bot) {
@@ -16,7 +16,7 @@ export function registerNewTask(bot) {
 
     if (!raw) {
       setPending(ctx.from.id, 'newtask_wizard', { step: 'title', roomId: room?.id ?? null, fields: {} });
-      return ctx.reply("📝 Starting a new task draft. What's the title? (/cancel to stop)");
+      return ctx.reply("📝 Starting a new task draft. What's the title? (/cancel to stop)", forceReplyExtra(ctx));
     }
 
     const [title, description, reward, requiredOutput, category, skillsRaw, maxAssigneesRaw] = raw
