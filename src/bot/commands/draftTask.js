@@ -1,4 +1,4 @@
-import { draftTask } from '../../ai/claude.js';
+import { draftTask } from '../../ai/graphs/draftTask.js';
 import { resolveCreationContext, createDraftTask, taskCreatedMessage } from './newTaskCore.js';
 import { commandRest } from '../commandArgs.js';
 

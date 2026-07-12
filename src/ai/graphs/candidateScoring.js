@@ -11,13 +11,13 @@ const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 const graph = new StateGraph({
   channels: {
     profile: null,
-    signals: null,
+    signal: null,
     score: null,
   },
 })
-  .addNode('gatherSignals', async (state) => {
+  .addNode('gatherSignal', async (state) => {
     // TODO Phase 2: collect Twitter/Telegram activity for state.profile
-    return { signals: state.signals ?? 'no signals collected yet' };
+    return { signal: state.signal ?? 'no signal collected yet' };
   })
   .addNode('scoreCandidate', async (state) => {
     const message = await anthropic.messages.create({
@@ -27,15 +27,15 @@ const graph = new StateGraph({
         {
           role: 'user',
           content:
-            'Based on the following signals, rate the contributor\'s trustworthiness (0-10 scale) and briefly explain why:\n' +
-            state.signals,
+            'Based on the following signal, rate the contributor\'s trustworthiness (0-10 scale) and briefly explain why:\n' +
+            state.signal,
         },
       ],
     });
     return { score: message.content[0].text };
   })
-  .addEdge('gatherSignals', 'scoreCandidate')
+  .addEdge('gatherSignal', 'scoreCandidate')
   .addEdge('scoreCandidate', END)
-  .setEntryPoint('gatherSignals');
+  .setEntryPoint('gatherSignal');
 
 export const candidateScoringGraph = graph.compile();

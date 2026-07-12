@@ -1,5 +1,5 @@
 import mammoth from 'mammoth';
-import { summarizeSubmission, reviewSubmissionImage, reviewSubmissionDocument } from './claude.js';
+import { reviewSubmissionGraph } from './graphs/reviewSubmission.js';
 
 const DOCX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const PLAIN_TEXT_MIME_TYPES = new Set(['text/plain', 'text/markdown', 'text/csv']);
@@ -14,23 +14,25 @@ async function downloadTelegramFile(ctx, fileId) {
   };
 }
 
-// Best-effort automated pre-review for a human reviewer, branched by
-// submission type. `submission` carries the content/file fields, `task`
-// carries the title/description/requiredOutput context. Returns null when
-// there's nothing to analyze (e.g. no content, or a file type we don't
-// support yet) - callers should treat that as "no AI note", not an error.
-// Never approves/rejects anything itself.
-export async function reviewSubmission(ctx, submission, task) {
+// Normalizes any supported submission into the graph's input shape:
+// { kind: 'text' | 'image' | 'pdf', payload, mediaType? }. Returns null for
+// unsupported types (video, legacy .doc, .xlsx, etc.) or when there's
+// nothing to analyze - callers should treat that as "no AI note".
+async function normalizeSubmission(ctx, submission) {
   if (submission.submissionType === 'TEXT' || submission.submissionType === 'LINK') {
     const content = submission.submissionFileMetadata?.convertedText || submission.submissionContent;
     if (!content) return null;
-    return summarizeSubmission(content, task);
+    return { kind: 'text', payload: content };
   }
 
   if (submission.submissionType === 'SCREENSHOT' && submission.submissionFileId) {
     const file = await downloadTelegramFile(ctx, submission.submissionFileId);
     if (!file) return null;
-    return reviewSubmissionImage(file.buffer.toString('base64'), file.contentType || 'image/jpeg', task);
+    return {
+      kind: 'image',
+      payload: file.buffer.toString('base64'),
+      mediaType: file.contentType || 'image/jpeg',
+    };
   }
 
   if (submission.submissionType === 'FILE' && submission.submissionFileId) {
@@ -39,7 +41,7 @@ export async function reviewSubmission(ctx, submission, task) {
     if (mimeType === 'application/pdf') {
       const file = await downloadTelegramFile(ctx, submission.submissionFileId);
       if (!file) return null;
-      return reviewSubmissionDocument(file.buffer.toString('base64'), task);
+      return { kind: 'pdf', payload: file.buffer.toString('base64') };
     }
 
     // .docx and plain-text-ish files are extracted locally (no API cost,
@@ -49,7 +51,7 @@ export async function reviewSubmission(ctx, submission, task) {
       if (!file) return null;
       const { value: text } = await mammoth.extractRawText({ buffer: file.buffer });
       if (!text?.trim()) return null;
-      return summarizeSubmission(text, task);
+      return { kind: 'text', payload: text };
     }
 
     if (mimeType && PLAIN_TEXT_MIME_TYPES.has(mimeType)) {
@@ -57,12 +59,19 @@ export async function reviewSubmission(ctx, submission, task) {
       if (!file) return null;
       const text = file.buffer.toString('utf-8');
       if (!text.trim()) return null;
-      return summarizeSubmission(text, task);
+      return { kind: 'text', payload: text };
     }
   }
 
-  // Video, or document types not handled above (e.g. legacy .doc, .xlsx,
-  // images embedded in other formats): Claude's API doesn't accept video
-  // input, and these aren't parsed yet - left for a later pass.
   return null;
+}
+
+// Best-effort automated pre-review for a human reviewer, routed through the
+// reviewSubmission LangGraph. Returns null when there's nothing to analyze;
+// never approves/rejects anything itself.
+export async function reviewSubmission(ctx, submission, task) {
+  const normalized = await normalizeSubmission(ctx, submission);
+  if (!normalized) return null;
+  const state = await reviewSubmissionGraph.invoke({ ...normalized, task });
+  return state.note ?? null;
 }

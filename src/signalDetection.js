@@ -1,5 +1,5 @@
 import { prisma } from './db.js';
-import { evaluateSignal } from './ai/claude.js';
+import { evaluateSignal } from './ai/graphs/signal.js';
 import { TASK_STATUS } from './workflow.js';
 
 const MIN_LENGTH = 15;
